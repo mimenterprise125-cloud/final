@@ -33,7 +33,7 @@ const Login = () => {
       }
 
       // If user needs email confirmation, Supabase returns user and possibly confirmationRequired info
-      navigate('/dashboard')
+      navigate('/dashboard/journal')
     })()
   };
 
@@ -47,7 +47,7 @@ const Login = () => {
 
     const { error } = await supabase.auth.signInWithOAuth({ 
       provider: 'google', 
-      options: { redirectTo: getOAuthRedirectUrl('/dashboard') }
+      options: { redirectTo: getOAuthRedirectUrl('/dashboard/journal') }
     })
     if (error) {
       toast({ title: 'OAuth failed', description: error.message, variant: 'destructive' })

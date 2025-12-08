@@ -12,12 +12,15 @@ interface LockedFeaturePageProps {
 }
 
 const LockedFeaturePage: React.FC<LockedFeaturePageProps> = ({ feature, children }) => {
+  // ALL HOOKS MUST BE CALLED FIRST - before any conditional returns
   const { adminSettings, togglePropFirmLock, toggleJournalLock, togglePerformanceAnalyticsLock } = useAdmin();
   const [isToggling, setIsToggling] = React.useState(false);
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Check maintenance mode first
   if (adminSettings.maintenance_mode) {
-    console.log('🔒 Maintenance mode is ON');
+    //console.log('🔒 Maintenance mode is ON');
     return <div className="flex items-center justify-center min-h-screen text-white">Under Maintenance</div>;
   }
 
@@ -27,12 +30,12 @@ const LockedFeaturePage: React.FC<LockedFeaturePageProps> = ({ feature, children
     (feature === 'journal' && adminSettings.journal_locked) ||
     (feature === 'performance' && adminSettings.performance_analytics_locked);
 
-  console.log(`🔍 LockedFeaturePage check for '${feature}':`, {
-    propfirm_locked: adminSettings.propfirm_locked,
-    journal_locked: adminSettings.journal_locked,
-    isLocked,
-    isToggling,
-  });
+  //console.log(`🔍 LockedFeaturePage check for '${feature}':`, {
+  //  //propfirm_locked: adminSettings.propfirm_locked,
+  //  //journal_locked: adminSettings.journal_locked,
+  //  //isLocked,
+  //  //isToggling,
+  //});
 
   // Handle toggle with immediate visual feedback
   const handleToggle = async () => {
@@ -53,8 +56,6 @@ const LockedFeaturePage: React.FC<LockedFeaturePageProps> = ({ feature, children
   // If toggling, keep showing the lock screen until the toggle completes
   const shouldShowLocked = isLocked || isToggling;
 
-  const navigate = useNavigate();
-  const { user } = useAuth();
   const isAdmin = user?.user_metadata?.role === 'admin';
 
   if (shouldShowLocked) {
@@ -67,7 +68,7 @@ const LockedFeaturePage: React.FC<LockedFeaturePageProps> = ({ feature, children
 
     const featureTitle = feature === 'propfirm' ? 'PropFirm' : feature === 'journal' ? 'Trading Journal' : 'Performance Analytics';
 
-    console.log(`🔐 ${feature} is LOCKED with type: ${lockType}`);
+    //console.log(`🔐 ${feature} is LOCKED with type: ${lockType}`);
     // Render children blurred and non-interactive behind a modal overlay
     return (
       <div className="relative w-full min-h-screen">

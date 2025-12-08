@@ -7,6 +7,7 @@ import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { DashboardProvider } from "./lib/DashboardContext";
 import { AuthProvider } from './lib/AuthProvider'
 import { AdminProvider } from './lib/AdminContext'
+import MaintenanceGuard from './components/MaintenanceGuard'
 import AuthGuard from './components/AuthGuard'
 import FeatureGuard from './components/FeatureGuard'
 import LockedFeaturePage from './components/LockedFeaturePage'
@@ -36,37 +37,39 @@ const App = () => (
       <AdminProvider>
       <Toaster />
       <Sonner />
-      <Router>
-      <DashboardProvider>
-        <Routes>
-          {/* Maintenance Page */}
-          <Route path="/maintenance" element={<UnderMaintenance />} />
+      <MaintenanceGuard>
+        <Router>
+        <DashboardProvider>
+          <Routes>
+            {/* Maintenance Page */}
+            <Route path="/maintenance" element={<UnderMaintenance />} />
 
-          {/* Public Routes */}
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/pricing" element={<Pricing />} />
+            {/* Public Routes */}
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/pricing" element={<Pricing />} />
 
-          {/* Admin Routes */}
-          <Route path="/admin" element={<AuthGuard><Admin /></AuthGuard>} />
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AuthGuard><Admin /></AuthGuard>} />
 
-          {/* Dashboard Routes */}
-          <Route path="/dashboard" element={<AuthGuard><DashboardLayout><LockedFeaturePage feature="propfirm"><Dashboard /></LockedFeaturePage></DashboardLayout></AuthGuard>} />
-          <Route path="/dashboard/accounts" element={<AuthGuard><DashboardLayout><Accounts /></DashboardLayout></AuthGuard>} />
-          <Route path="/dashboard/copier" element={<AuthGuard><DashboardLayout><TradeCopier /></DashboardLayout></AuthGuard>} />
-          <Route path="/dashboard/journal" element={<AuthGuard><DashboardLayout><LockedFeaturePage feature="journal"><TradingJournal /></LockedFeaturePage></DashboardLayout></AuthGuard>} />
-          <Route path="/dashboard/performance" element={<AuthGuard><DashboardLayout><Performance /></DashboardLayout></AuthGuard>} />
-          <Route path="/dashboard/payouts" element={<AuthGuard><DashboardLayout><Payouts /></DashboardLayout></AuthGuard>} />
-          <Route path="/dashboard/settings" element={<AuthGuard><DashboardLayout><Settings /></DashboardLayout></AuthGuard>} />
+            {/* Dashboard Routes */}
+            <Route path="/dashboard" element={<AuthGuard><DashboardLayout><LockedFeaturePage feature="propfirm"><Dashboard /></LockedFeaturePage></DashboardLayout></AuthGuard>} />
+            <Route path="/dashboard/accounts" element={<AuthGuard><DashboardLayout><Accounts /></DashboardLayout></AuthGuard>} />
+            <Route path="/dashboard/copier" element={<AuthGuard><DashboardLayout><TradeCopier /></DashboardLayout></AuthGuard>} />
+            <Route path="/dashboard/journal" element={<AuthGuard><DashboardLayout><LockedFeaturePage feature="journal"><TradingJournal /></LockedFeaturePage></DashboardLayout></AuthGuard>} />
+            <Route path="/dashboard/performance" element={<AuthGuard><DashboardLayout><Performance /></DashboardLayout></AuthGuard>} />
+            <Route path="/dashboard/payouts" element={<AuthGuard><DashboardLayout><Payouts /></DashboardLayout></AuthGuard>} />
+            <Route path="/dashboard/settings" element={<AuthGuard><DashboardLayout><Settings /></DashboardLayout></AuthGuard>} />
 
-          {/* Catch-all */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </DashboardProvider>
-      </Router>
+            {/* Catch-all */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </DashboardProvider>
+        </Router>
+      </MaintenanceGuard>
       </AdminProvider>
   </AuthProvider>
   </TooltipProvider>

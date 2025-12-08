@@ -30,6 +30,10 @@ export default {
         display: ["Altron", "Inter", "system-ui"],
       },
       colors: {
+        // New brand color palette
+        'brand-light': '#E9F1FA',
+        'brand-bright': '#00ABE4',
+        'brand-white': '#FFFFFF',
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

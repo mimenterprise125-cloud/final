@@ -34,7 +34,7 @@ const Signup = () => {
           description: 'Your account is now active. Welcome to TradeOne!',
           duration: 5000
         })
-        setTimeout(() => navigate('/dashboard'), 1500)
+        setTimeout(() => navigate('/dashboard/journal'), 1500)
       }
     })
 
@@ -60,7 +60,7 @@ const Signup = () => {
           email: email, 
           password,
           options: {
-            redirectTo: getOAuthRedirectUrl('/dashboard')
+            redirectTo: getOAuthRedirectUrl('/dashboard/journal')
           }
         })
 
@@ -122,7 +122,7 @@ const Signup = () => {
 
     const { error } = await supabase.auth.signInWithOAuth({ 
       provider: 'google', 
-      options: { redirectTo: getOAuthRedirectUrl('/dashboard') }
+      options: { redirectTo: getOAuthRedirectUrl('/dashboard/journal') }
     })
     if (error) {
       toast({ title: 'OAuth failed', description: error.message, variant: 'destructive' })
