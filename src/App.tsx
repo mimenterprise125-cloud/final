@@ -1,0 +1,76 @@
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { HashRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { DashboardLayout } from "./components/layout/DashboardLayout";
+import { DashboardProvider } from "./lib/DashboardContext";
+import { AuthProvider } from './lib/AuthProvider'
+import { AdminProvider } from './lib/AdminContext'
+import AuthGuard from './components/AuthGuard'
+import FeatureGuard from './components/FeatureGuard'
+import LockedFeaturePage from './components/LockedFeaturePage'
+import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import Signup from "./pages/Signup";
+import ResetPassword from "./pages/ResetPassword";
+import Dashboard from "./pages/dashboard/Dashboard";
+import Accounts from "./pages/dashboard/Accounts";
+import TradeCopier from "./pages/dashboard/TradeCopier";
+import TradingJournal from "./pages/dashboard/TradingJournal";
+import Performance from "./pages/dashboard/Performance";
+import Payouts from "./pages/dashboard/Payouts";
+import Settings from "./pages/dashboard/Settings";
+import Admin from "./pages/Admin";
+import UnderMaintenance from "./pages/UnderMaintenance";
+import Pricing from "./pages/Pricing";
+import NotFound from "./pages/NotFound";
+
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+      <AuthProvider>
+      <AdminProvider>
+      <Toaster />
+      <Sonner />
+      <Router>
+      <DashboardProvider>
+        <Routes>
+          {/* Maintenance Page */}
+          <Route path="/maintenance" element={<UnderMaintenance />} />
+
+          {/* Public Routes */}
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/pricing" element={<Pricing />} />
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AuthGuard><Admin /></AuthGuard>} />
+
+          {/* Dashboard Routes */}
+          <Route path="/dashboard" element={<AuthGuard><DashboardLayout><LockedFeaturePage feature="propfirm"><Dashboard /></LockedFeaturePage></DashboardLayout></AuthGuard>} />
+          <Route path="/dashboard/accounts" element={<AuthGuard><DashboardLayout><Accounts /></DashboardLayout></AuthGuard>} />
+          <Route path="/dashboard/copier" element={<AuthGuard><DashboardLayout><TradeCopier /></DashboardLayout></AuthGuard>} />
+          <Route path="/dashboard/journal" element={<AuthGuard><DashboardLayout><LockedFeaturePage feature="journal"><TradingJournal /></LockedFeaturePage></DashboardLayout></AuthGuard>} />
+          <Route path="/dashboard/performance" element={<AuthGuard><DashboardLayout><Performance /></DashboardLayout></AuthGuard>} />
+          <Route path="/dashboard/payouts" element={<AuthGuard><DashboardLayout><Payouts /></DashboardLayout></AuthGuard>} />
+          <Route path="/dashboard/settings" element={<AuthGuard><DashboardLayout><Settings /></DashboardLayout></AuthGuard>} />
+
+          {/* Catch-all */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </DashboardProvider>
+      </Router>
+      </AdminProvider>
+  </AuthProvider>
+  </TooltipProvider>
+  </QueryClientProvider>
+);
+
+export default App;
