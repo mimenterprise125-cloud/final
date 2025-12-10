@@ -276,15 +276,3 @@ All colors MUST be HSL.
   }
 
 }
-
-  /* Prevent SVG/Canvas from overflowing their containers (Recharts uses SVG) */
-  svg, canvas {
-    max-width: 100% !important;
-    height: auto !important;
-  }
-
-  /* Ensure table cells wrap long text instead of forcing horizontal scroll */
-  table td, table th {
-    word-break: break-word;
-    white-space: normal;
-  }

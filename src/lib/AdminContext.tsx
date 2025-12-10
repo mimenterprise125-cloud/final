@@ -9,6 +9,16 @@ export interface PricingTier {
   locked_sections: string[];
 }
 
+export interface SocialLink {
+  id: string;
+  link_type: 'community' | 'footer';
+  label: string;
+  url: string;
+  order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface AdminSettings {
   pricing_enabled: boolean;
   pricing_tiers: PricingTier[];
@@ -24,6 +34,8 @@ export interface AdminSettings {
   total_user_count: number;
   error_logs: ErrorLog[];
   locked_sections: string[];
+  community_links: SocialLink[];
+  footer_social_links: SocialLink[];
 }
 
 export interface ErrorLog {
@@ -49,6 +61,7 @@ interface AdminContextType {
   addErrorLog: (error: Omit<ErrorLog, 'id' | 'timestamp'>) => Promise<void>;
   clearErrorLogs: () => Promise<void>;
   updatePricingTiers: (tiers: PricingTier[]) => Promise<void>;
+  updateSocialLinks: (links: SocialLink[]) => Promise<void>;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
@@ -69,6 +82,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     total_user_count: 0,
     error_logs: [],
     locked_sections: [],
+    community_links: [],
+    footer_social_links: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +179,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           total_user_count: data.total_user_count || 0,
           error_logs: data.error_logs || [],
           locked_sections: data.locked_sections || [],
+          community_links: data.community_links || [],
+          footer_social_links: data.footer_social_links || [],
         });
       }
 
@@ -172,6 +189,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // Fetch error logs
       await fetchErrorLogs();
+
+      // Fetch social links
+      await fetchSocialLinks();
     } catch (err) {
       console.warn('Failed to fetch admin settings:', err);
       setError('Admin settings table not yet created. Run the migration.');
@@ -232,6 +252,31 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }));
     } catch (err) {
       console.warn('Failed to fetch error logs - table may not exist yet:', err);
+    }
+  };
+
+  const fetchSocialLinks = async () => {
+    try {
+      const { data, error: linksError } = await supabase
+        .from('admin_social_links')
+        .select('*')
+        .order('order', { ascending: true });
+
+      if (linksError) {
+        console.warn('Social links table may not exist yet:', linksError);
+        return;
+      }
+
+      const communityLinks = (data || []).filter(link => link.link_type === 'community');
+      const footerLinks = (data || []).filter(link => link.link_type === 'footer');
+
+      setAdminSettings((prev) => ({
+        ...prev,
+        community_links: communityLinks,
+        footer_social_links: footerLinks,
+      }));
+    } catch (err) {
+      console.warn('Failed to fetch social links - table may not exist yet:', err);
     }
   };
 
@@ -361,6 +406,110 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
+  const updateSocialLinks = async (links: SocialLink[]) => {
+    try {
+      console.log('💾 Saving social links:', links);
+      
+      // Separate links by type
+      const communityLinks = links.filter(l => l.link_type === 'community');
+      const footerLinks = links.filter(l => l.link_type === 'footer');
+
+      // Sanitize and validate URLs before saving
+      const sanitizeUrl = (url: string): string => {
+        try {
+          // Ensure URL is properly formatted
+          let sanitized = url.trim();
+          
+          // Remove any duplicate protocols
+          while (sanitized.includes('://')) {
+            const firstIndex = sanitized.indexOf('://');
+            const beforeProtocol = sanitized.substring(0, firstIndex);
+            if (beforeProtocol.includes('://')) {
+              // Remove the extra protocol
+              sanitized = sanitized.substring(firstIndex - 4);
+            } else {
+              break;
+            }
+          }
+
+          // Try to parse as URL to validate
+          new URL(sanitized);
+          return sanitized;
+        } catch (error) {
+          console.error('Invalid URL:', url, error);
+          throw new Error(`Invalid URL format: ${url}`);
+        }
+      };
+
+      // Delete existing links for each type and insert new ones
+      await Promise.all([
+        // Update community links
+        (async () => {
+          // Delete existing community links
+          await supabase
+            .from('admin_social_links')
+            .delete()
+            .eq('link_type', 'community');
+
+          // Insert new community links (filter out temp IDs)
+          if (communityLinks.length > 0) {
+            const { error } = await supabase
+              .from('admin_social_links')
+              .insert(
+                communityLinks.map(link => ({
+                  link_type: link.link_type,
+                  label: link.label,
+                  url: sanitizeUrl(link.url),
+                  order: link.order,
+                }))
+              );
+
+            if (error) {
+              console.error('❌ Error inserting community links:', error);
+              throw error;
+            }
+          }
+        })(),
+
+        // Update footer links
+        (async () => {
+          // Delete existing footer links
+          await supabase
+            .from('admin_social_links')
+            .delete()
+            .eq('link_type', 'footer');
+
+          // Insert new footer links (filter out temp IDs)
+          if (footerLinks.length > 0) {
+            const { error } = await supabase
+              .from('admin_social_links')
+              .insert(
+                footerLinks.map(link => ({
+                  link_type: link.link_type,
+                  label: link.label,
+                  url: sanitizeUrl(link.url),
+                  order: link.order,
+                }))
+              );
+
+            if (error) {
+              console.error('❌ Error inserting footer links:', error);
+              throw error;
+            }
+          }
+        })(),
+      ]);
+
+      // Fetch fresh data from database to update UI state
+      await fetchSocialLinks();
+      console.log('✅ Social links saved successfully');
+    } catch (error) {
+      console.error('❌ Failed to update social links:', error);
+      setError('Failed to save social links');
+      throw error;
+    }
+  };
+
   return (
     <AdminContext.Provider
       value={{
@@ -376,6 +525,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addErrorLog,
         clearErrorLogs,
         updatePricingTiers,
+        updateSocialLinks,
       }}
     >
       {children}

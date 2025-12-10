@@ -619,13 +619,13 @@ const Performance = () => {
                             <XAxis 
                               dataKey="name" 
                               stroke="hsl(var(--muted-foreground))" 
-                              style={{ fontSize: '10px' }} 
+                              style={{ fontSize: '9px' }} 
                               opacity={0.6}
-                              tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                              interval={0}
+                              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }}
+                              interval={Math.ceil(rrData.length / 5)}
                               angle={-45}
                               textAnchor="end"
-                              height={60}
+                              height={40}
                             />
                             <YAxis 
                               stroke="hsl(var(--muted-foreground))" 
@@ -649,9 +649,12 @@ const Performance = () => {
                               cursor={{ stroke: 'rgba(6, 182, 212, 0.3)', strokeWidth: 2 }}
                             />
                             <Legend 
-                              wrapperStyle={{ paddingTop: '20px' }}
+                              wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }}
                               iconType="line"
-                              formatter={(value) => value === 'target' ? 'Planned RR' : 'Achieved RR'}
+                              layout="vertical"
+                              align="right"
+                              verticalAlign="middle"
+                              formatter={(value) => value === 'target' ? 'Planned' : 'Achieved'}
                             />
                             <Line 
                               type="monotone" 
@@ -930,8 +933,8 @@ const Performance = () => {
           <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full blur-3xl -z-10" />
           
           {symbolStrategyMatrix.length > 0 ? (
-            <div className="w-full flex justify-center">
-              <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory items-start">
+            <div className="w-full flex justify-center overflow-hidden">
+              <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory items-start w-full">
                 {symbolStrategyMatrix.map((row, idx) => (
                 <motion.div
                   key={idx}
