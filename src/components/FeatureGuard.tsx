@@ -25,13 +25,7 @@ const FeatureGuard: React.FC<FeatureGuardProps> = ({ feature, children }) => {
     return userRole === 'admin';
   }, [user]);
 
-  // Check maintenance mode first
-  if (adminSettings.maintenance_mode) {
-    console.log('🔒 Maintenance mode is ON');
-    return <UnderMaintenance />;
-  }
-
-  // Check if the specific feature is locked
+  // Check if the specific feature is locked FIRST (before maintenance mode)
   const isLocked =
     (feature === 'propfirm' && adminSettings.propfirm_locked) ||
     (feature === 'journal' && adminSettings.journal_locked);
@@ -41,6 +35,13 @@ const FeatureGuard: React.FC<FeatureGuardProps> = ({ feature, children }) => {
     journal_locked: adminSettings.journal_locked,
     isLocked,
   });
+
+  // Check maintenance mode AFTER checking if feature is locked
+  // This way, locked features show their lock modal even if maintenance mode is on
+  if (adminSettings.maintenance_mode && !isLocked) {
+    console.log('🔒 Maintenance mode is ON (feature is not locked)');
+    return <UnderMaintenance />;
+  }
 
   // Handle toggle with immediate visual feedback
   const handleToggle = async () => {
