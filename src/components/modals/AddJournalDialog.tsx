@@ -991,24 +991,30 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                     </div>
                   </div>
                   {/* Save Button - Appears when symbol is typed AND NO matching symbols found */}
-                  {symbolSearchInput.trim().length > 0 && 
-                   !symbols.some(s => symbolMatches(s, symbolSearchInput) || s.toUpperCase().includes(symbolSearchInput)) && (
-                    <Button 
-                      type="button" 
-                      size="sm" 
-                      className="h-10 bg-accent hover:bg-accent/90 text-white font-medium mt-0 sm:mt-0 flex-shrink-0 w-full sm:w-auto"
-                      onClick={() => {
-                        const trimmed = symbolSearchInput.trim().toUpperCase();
-                        if (trimmed && trimmed.length > 0) {
-                          handleAddSymbol(trimmed);
-                          setSymbolSearchInput("");
-                          setFormData({ ...formData, symbol: "" });
-                        }
-                      }}
-                    >
-                      💾 Save
-                    </Button>
-                  )}
+                  {(() => {
+                    const hasMatches = symbols.some(s => 
+                      symbolMatches(s, symbolSearchInput) || 
+                      s.toUpperCase().includes(symbolSearchInput)
+                    );
+                    const shouldShowSave = symbolSearchInput.trim().length > 0 && !hasMatches;
+                    return shouldShowSave ? (
+                      <Button 
+                        type="button" 
+                        size="sm" 
+                        className="h-10 bg-accent hover:bg-accent/90 text-white font-medium mt-0 sm:mt-0 flex-shrink-0 w-full sm:w-auto"
+                        onClick={() => {
+                          const trimmed = symbolSearchInput.trim().toUpperCase();
+                          if (trimmed && trimmed.length > 0) {
+                            handleAddSymbol(trimmed);
+                            setSymbolSearchInput("");
+                            setFormData({ ...formData, symbol: "" });
+                          }
+                        }}
+                      >
+                        💾 Save
+                      </Button>
+                    ) : null;
+                  })()}
                 </div>
               </div>
 
