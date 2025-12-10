@@ -217,160 +217,25 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
       }
     }
 
-    // === STOP LOSS DIRECTION VALIDATION ===
-    // Buy trade: SL must be BELOW entry price (entry_price > stop_loss_price)
-    // Sell trade: SL must be ABOVE entry price (entry_price < stop_loss_price)
-    // Example: Buy at 4650 → SL must be < 4650 (like 4640)
+    // === POINTS VALIDATION (POSITIVE VALUES ONLY) ===
+    // SL and TP points must be positive values
     
     try {
-      const entryPrice = parseFloat(formData.entry_price || '0');
-      const slPrice = parseFloat(formData.stop_loss_price || '0');
-      const slPoints = parseFloat(formData.stop_loss_points || '0');
-      
-      // Validate SL Price if both entry and SL are provided
-      if (entryPrice > 0 && slPrice > 0) {
-        if (formData.direction === 'Buy') {
-          // For Buy: SL must be BELOW entry (slPrice < entryPrice)
-          if (slPrice >= entryPrice) {
-            errs.stop_loss_price = `Stop loss (${slPrice}) must be BELOW entry price (${entryPrice}) for Buy trades`;
-          }
-        } else if (formData.direction === 'Sell') {
-          // For Sell: SL must be ABOVE entry (slPrice > entryPrice)
-          if (slPrice <= entryPrice) {
-            errs.stop_loss_price = `Stop loss (${slPrice}) must be ABOVE entry price (${entryPrice}) for Sell trades`;
-          }
-        }
-      }
-      
-      // SL Points direction validation
-      if (entryPrice > 0 && slPoints > 0) {
-        if (formData.direction === 'Buy') {
-          // Buy: SL = Entry - Points (must be positive)
-          const calculatedSL = entryPrice - slPoints;
-          if (calculatedSL <= 0) {
-            errs.stop_loss_points = `Stop loss points (${slPoints}) cannot exceed entry price (${entryPrice}) for Buy trades`;
-          }
-        } else if (formData.direction === 'Sell') {
-          // Sell: SL = Entry + Points (no upper limit needed here)
-          if (slPoints < 0) {
-            errs.stop_loss_points = 'Stop loss points must be positive';
-          }
-        }
-      }
-      
-    } catch (e) {}
-
-    // === TARGET PRICE DIRECTION VALIDATION ===
-    // Buy trade: TP must be ABOVE entry price (target_price > entry_price)
-    // Sell trade: TP must be BELOW entry price (target_price < entry_price)
-    // Example: Buy at 4650 → TP must be > 4650 (like 4670)
-    
-    try {
-      const entryPrice = parseFloat(formData.entry_price || '0');
-      const tpPrice = parseFloat(formData.target_price || '0');
-      const tpPoints = parseFloat(formData.target_points || '0');
-      
-      // Validate TP Price if both entry and TP are provided
-      if (entryPrice > 0 && tpPrice > 0) {
-        if (formData.direction === 'Buy') {
-          // For Buy: TP must be ABOVE entry (tpPrice > entryPrice)
-          if (tpPrice <= entryPrice) {
-            errs.target_price = `Target (${tpPrice}) must be ABOVE entry price (${entryPrice}) for Buy trades`;
-          }
-        } else if (formData.direction === 'Sell') {
-          // For Sell: TP must be BELOW entry (tpPrice < entryPrice)
-          if (tpPrice >= entryPrice) {
-            errs.target_price = `Target (${tpPrice}) must be BELOW entry price (${entryPrice}) for Sell trades`;
-          }
-        }
-      }
-      
-      // TP Points direction validation with immediate feedback
-      if (tpPoints > 0) {
-        // Immediate validation: TP points must be positive
-        if (tpPoints < 0) {
-          errs.target_points = 'Target points must be positive';
-        }
-        
-        // If entry price exists, validate based on direction
-        if (entryPrice > 0) {
-          if (formData.direction === 'Buy') {
-            // Buy: TP = Entry + Points (no upper limit needed)
-            // Just validate points are positive (already done above)
-          } else if (formData.direction === 'Sell') {
-            // Sell: TP = Entry - Points (must result in positive price)
-            const calculatedTP = entryPrice - tpPoints;
-            if (calculatedTP <= 0) {
-              errs.target_points = `❌ Target points (${tpPoints}) exceeds entry (${entryPrice}). Max: ${entryPrice - 0.001}`;
-            }
-          }
-        } else if (entryPrice <= 0 && !errs.target_points) {
-          // Entry price missing but points provided
-          errs.target_points = 'Entry price required to validate target points';
-        }
-      }
-      
-    } catch (e) {}
-
-    // === POINTS-BASED COMPREHENSIVE VALIDATION ===
-    // Real-time validation for SL and TP points with immediate feedback
-    
-    try {
-      const entryPrice = parseFloat(formData.entry_price || '0');
       const slPoints = parseFloat(formData.stop_loss_points || '0');
       const tpPoints = parseFloat(formData.target_points || '0');
       
-      // STOP LOSS POINTS IMMEDIATE VALIDATION
-      if (slPoints > 0) {
-        // Check if points are positive
-        if (slPoints < 0) {
-          errs.stop_loss_points = 'Stop loss points must be positive';
-        }
-        
-        // If entry price exists, validate SL points
-        if (entryPrice > 0) {
-          if (formData.direction === 'Buy') {
-            // Buy: SL = Entry - Points (must result in positive price)
-            const calculatedSL = entryPrice - slPoints;
-            if (calculatedSL <= 0) {
-              errs.stop_loss_points = `❌ SL points (${slPoints}) exceeds entry (${entryPrice}). Max: ${entryPrice - 0.001}`;
-            }
-          } else if (formData.direction === 'Sell') {
-            // Sell: SL = Entry + Points (no upper limit needed)
-            // Just validate points are positive (already done above)
-          }
-        } else if (entryPrice <= 0 && !errs.stop_loss_points) {
-          // Entry price missing but points provided - only show if not already showing required error
-          if (!errs.stop_loss_points || !errs.stop_loss_points.includes('required')) {
-            errs.stop_loss_points = 'Entry price required to validate SL points';
-          }
-        }
+      // Validate points are positive if provided
+      if (slPoints < 0) {
+        errs.stop_loss_points = 'Stop loss points must be positive';
       }
-      
-      // TARGET POINTS IMMEDIATE VALIDATION (supplementary check)
-      if (tpPoints > 0) {
-        if (tpPoints < 0) {
-          if (!errs.target_points) errs.target_points = 'Target points must be positive';
-        }
-        
-        if (entryPrice > 0) {
-          if (formData.direction === 'Sell') {
-            const calculatedTP = entryPrice - tpPoints;
-            if (calculatedTP <= 0 && !errs.target_points) {
-              errs.target_points = `❌ Target points (${tpPoints}) exceeds entry (${entryPrice}). Max: ${entryPrice - 0.001}`;
-            }
-          }
-        } else if (entryPrice <= 0 && !errs.target_points) {
-          // Only show if not already showing required error
-          if (!errs.target_points || !errs.target_points.includes('required')) {
-            errs.target_points = 'Entry price required to validate target points';
-          }
-        }
+      if (tpPoints < 0) {
+        errs.target_points = 'Target points must be positive';
       }
-      
     } catch (e) {}
 
     setErrors(errs);
+    console.log('📋 Form Validation Errors:', errs);
+    console.log('📊 Form Data:', formData);
   }, [formData]);
 
   // Triggered when Save is clicked from the small add-symbol popover
@@ -1248,44 +1113,6 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
               <span className="text-rose-500 font-bold text-xs">* (SL/TP Points & Amount required)</span>
             </div>
             
-            {/* Amount-based P&L */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col space-y-2">
-                <div className="flex items-center gap-1">
-                  <Label className="text-xs font-semibold text-rose-400">Stop Loss ($$)</Label>
-                  <span className="text-rose-400 text-xs">⚠️</span>
-                </div>
-                <Input 
-                  className={`h-10 px-3 text-sm bg-background/50 text-rose-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 transition-all border-2 border-rose-500`} 
-                  type="number" 
-                  step="0.01" 
-                  value={formData.stop_loss_price} 
-                  onChange={(e) => setFormData({ ...formData, stop_loss_price: e.target.value })} 
-                  disabled={formData.result === "MANUAL"} 
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="flex flex-col space-y-2">
-                <div className="flex items-center gap-1">
-                  <Label className="text-xs font-semibold text-emerald-400">Target ($$)</Label>
-                  {errors.target && <span className="text-rose-400 text-xs">⚠️</span>}
-                </div>
-                <Input 
-                  className={`h-10 px-3 text-sm bg-background/50 text-emerald-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all ${
-                    errors.target 
-                      ? 'border-2 border-rose-500' 
-                      : 'border border-emerald-400/30'
-                  }`} 
-                  type="number" 
-                  step="0.01" 
-                  value={formData.target_price} 
-                  onChange={(e) => setFormData({ ...formData, target_price: e.target.value })} 
-                  disabled={formData.result === "MANUAL"}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
             {/* Points-based P&L */}
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col space-y-2">
@@ -1326,6 +1153,44 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                   onChange={(e)=> setFormData({...formData, target_points: e.target.value})}
                   disabled={formData.result === "MANUAL"}
                   placeholder="0.0"
+                />
+              </div>
+            </div>
+
+            {/* Amount-based P&L */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs font-semibold text-rose-400">Stop Loss ($$)</Label>
+                  <span className="text-rose-400 text-xs">⚠️</span>
+                </div>
+                <Input 
+                  className={`h-10 px-3 text-sm bg-background/50 text-rose-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 transition-all border-2 border-rose-500`} 
+                  type="number" 
+                  step="0.01" 
+                  value={formData.stop_loss_price} 
+                  onChange={(e) => setFormData({ ...formData, stop_loss_price: e.target.value })} 
+                  disabled={formData.result === "MANUAL"} 
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs font-semibold text-emerald-400">Target ($$)</Label>
+                  {errors.target && <span className="text-rose-400 text-xs">⚠️</span>}
+                </div>
+                <Input 
+                  className={`h-10 px-3 text-sm bg-background/50 text-emerald-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all ${
+                    errors.target 
+                      ? 'border-2 border-rose-500' 
+                      : 'border border-emerald-400/30'
+                  }`} 
+                  type="number" 
+                  step="0.01" 
+                  value={formData.target_price} 
+                  onChange={(e) => setFormData({ ...formData, target_price: e.target.value })} 
+                  disabled={formData.result === "MANUAL"}
+                  placeholder="0.00"
                 />
               </div>
             </div>
