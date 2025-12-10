@@ -35,7 +35,7 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
     session: "No Session",
     setup_name: "",
     setup_rating: "B",
-    execution_type: "",
+    execution_type: "Market",  // Default: Market execution
     entry_price: "",
     stop_loss_price: "",
     target_price: "",
@@ -166,8 +166,10 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
       errs.setup_rating = 'Setup rating (A-F) is required *';
     }
     
-    if (!formData.execution_type || formData.execution_type.trim() === '') {
-      errs.execution_type = 'Execution type is required *';
+    // execution_type has default value "Market", so it's not strictly required
+    // but we can still validate if it's provided
+    if (formData.execution_type && formData.execution_type.trim() === '') {
+      errs.execution_type = 'Invalid execution type';
     }
     
     if (!formData.result || formData.result.trim() === '') {
@@ -1194,9 +1196,9 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                     ? 'border-2 border-rose-500'
                     : 'border border-border/50'
                 }`} value={formData.execution_type} onChange={(e) => setFormData({ ...formData, execution_type: e.target.value })}>
-                  <option value="">Market</option>
-                  <option>Limit</option>
-                  <option>Stop</option>
+                  <option value="Market">📊 Market</option>
+                  <option value="Limit">📌 Limit</option>
+                  <option value="Stop">🛑 Stop</option>
                 </select>
                 <div className="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1533,6 +1535,18 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
 
             </div>
             </div>
+
+          {/* Debug: Show errors if any exist */}
+          {Object.keys(errors).length > 0 && (
+            <div className="mx-4 sm:mx-6 mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <p className="text-xs font-semibold text-red-600 mb-2">❌ Errors preventing submission:</p>
+              <div className="text-xs text-red-600 space-y-1">
+                {Object.entries(errors).map(([key, msg]) => (
+                  <p key={key}>• {msg}</p>
+                ))}
+              </div>
+            </div>
+          )}
 
           <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 px-4 sm:px-6 py-4 border-t border-border/30 flex-shrink-0 bg-gradient-to-t from-background/80 to-transparent">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Cancel</Button>
