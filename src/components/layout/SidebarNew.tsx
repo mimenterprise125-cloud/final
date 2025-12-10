@@ -57,7 +57,7 @@ export const Sidebar = ({ onNavigate, collapsed = false, onToggle, viewMode = 'p
   return (
     <div className="h-full flex flex-col relative sidebar-bg sidebar-font">
       <div className={cn("h-full flex flex-col", collapsed ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto")}>
-        <div className="p-6 border-b border-border/50 bg-gradient-to-b from-background to-background/50 backdrop-blur-sm">
+        <div className="p-6 sm:p-4 border-b border-border/50 bg-gradient-to-b from-background to-background/50 backdrop-blur-sm">
           <Link to="/dashboard" onClick={handleClick} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <BrandLogo size={28} />
             <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent brand-font">TradeOne</span>
