@@ -33,7 +33,7 @@ const MetricCard = ({ title, value, hint, icon: Icon, trend }: { title: string; 
         
         <div className="relative flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{title}</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest truncate">{title}</p>
             <motion.h3
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
@@ -42,7 +42,7 @@ const MetricCard = ({ title, value, hint, icon: Icon, trend }: { title: string; 
             >
               {value}
             </motion.h3>
-            {hint && <p className="text-xs text-muted-foreground mt-1 sm:mt-2">{hint}</p>}
+            {hint && <p className="text-xs text-muted-foreground mt-1 sm:mt-2 break-words line-clamp-2">{hint}</p>}
           </div>
           {Icon && (
             <motion.div
@@ -318,9 +318,9 @@ const Performance = () => {
   }, [user])
 
   return (
-    <div className="space-y-6 sm:space-y-8 overflow-x-hidden">
+    <div className="space-y-6 sm:space-y-8 overflow-x-hidden w-full max-w-full">
       {/* HEADER */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start justify-between gap-4 sm:gap-0">
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start justify-between gap-4 sm:gap-0 w-full">
         <div className="w-full">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-cyan-400 to-emerald-400 bg-clip-text text-transparent">Performance Analytics</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-2">Professional trading performance breakdown with advanced metrics</p>
@@ -329,7 +329,7 @@ const Performance = () => {
 
       {/* PERFORMANCE OVERVIEW - KEY METRICS */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
           <MetricCard title="Expectancy per Trade" value={`${typeof metrics.expectancy === 'number' ? '$' + metrics.expectancy.toFixed(2) : '—'}`} hint={`Expected $${(metrics.projectedGain ?? 0).toFixed(2)} per 100 trades`} icon={Target} trend={(metrics.expectancy ?? 0) > 0 ? 'up' : 'down'} />
           <MetricCard title="Win Rate" value={`${metrics.winRate ?? 0}%`} hint={`${metrics.wins ?? 0} wins / ${metrics.losses ?? 0} losses`} icon={TrendingUp} trend={(metrics.winRate ?? 0) > 50 ? 'up' : 'down'} />
           <MetricCard title="Max Win Streak" value={metrics.maxWinStreak ?? 0} hint="Consecutive winning trades" icon={Zap} trend="up" />
@@ -344,7 +344,7 @@ const Performance = () => {
       {/* TRADE RESULTS BREAKDOWN PIE CHART */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
         <SectionHeader icon="" title="Trade Results Distribution" />
-        <Card className="p-4 sm:p-5 border border-violet-500/30 shadow-2xl hover:shadow-3xl hover:border-violet-500/50 transition-all duration-300 bg-gradient-to-br from-violet-500/5 via-slate-900/20 to-background relative overflow-hidden">
+        <Card className="p-4 sm:p-5 border border-violet-500/30 shadow-2xl hover:shadow-3xl hover:border-violet-500/50 transition-all duration-300 bg-gradient-to-br from-violet-500/5 via-slate-900/20 to-background relative overflow-hidden w-full">
           <div className="absolute top-0 right-0 w-32 sm:w-40 md:w-60 h-32 sm:h-40 md:h-60 bg-gradient-to-br from-violet-500/15 to-transparent rounded-full blur-3xl -z-10" />
           <div className="absolute bottom-0 left-0 w-40 sm:w-60 md:w-80 h-40 sm:h-60 md:h-80 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full blur-3xl -z-10" />
           
@@ -540,7 +540,7 @@ const Performance = () => {
             <SectionHeader icon="" title="Risk-to-Reward Execution" />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
                 <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
-                  <Card className="p-5 sm:p-6 border border-emerald-500/30 shadow-lg hover:shadow-2xl hover:border-emerald-500/50 transition-all duration-300 bg-gradient-to-br from-emerald-500/5 via-slate-900/20 to-background relative overflow-hidden">
+                  <Card className="p-5 sm:p-6 border border-emerald-500/30 shadow-lg hover:shadow-2xl hover:border-emerald-500/50 transition-all duration-300 bg-gradient-to-br from-emerald-500/5 via-slate-900/20 to-background relative overflow-hidden w-full">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full blur-3xl -z-10" />
                     
                     <div className="space-y-4">
@@ -590,7 +590,7 @@ const Performance = () => {
                 </motion.div>
 
                 <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
-                  <Card className="p-5 sm:p-6 border border-blue-500/30 shadow-lg hover:shadow-2xl hover:border-blue-500/50 transition-all duration-300 bg-gradient-to-br from-blue-500/5 via-slate-900/20 to-background relative overflow-hidden">
+                  <Card className="p-5 sm:p-6 border border-blue-500/30 shadow-lg hover:shadow-2xl hover:border-blue-500/50 transition-all duration-300 bg-gradient-to-br from-blue-500/5 via-slate-900/20 to-background relative overflow-hidden w-full">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-3xl -z-10" />
                     
                     <div className="flex items-center justify-between mb-4">
@@ -600,8 +600,9 @@ const Performance = () => {
                       </div>
                     </div>
                     
-                    <div style={{ height: 280, width: '100%' }}>
+                    <div style={{ height: 280, width: '100%' }} className="overflow-x-auto">
                       {rrData.length > 0 ? (
+                        <div style={{ width: '100%', height: 280 }} className="overflow-x-hidden">
                         <ResponsiveContainer width="100%" height={280}>
                           <LineChart data={rrData.slice(-20)}>
                             <defs>
@@ -618,9 +619,13 @@ const Performance = () => {
                             <XAxis 
                               dataKey="name" 
                               stroke="hsl(var(--muted-foreground))" 
-                              style={{ fontSize: '11px' }} 
+                              style={{ fontSize: '10px' }} 
                               opacity={0.6}
                               tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                              interval={0}
+                              angle={-45}
+                              textAnchor="end"
+                              height={60}
                             />
                             <YAxis 
                               stroke="hsl(var(--muted-foreground))" 
@@ -675,6 +680,7 @@ const Performance = () => {
                             />
                           </LineChart>
                         </ResponsiveContainer>
+                        </div>
                       ) : (
                         <motion.div 
                           initial={{ opacity: 0, scale: 0.95 }}
@@ -694,7 +700,7 @@ const Performance = () => {
       {/* STRATEGY BREAKDOWN */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
         <SectionHeader icon="" title="Strategy Breakdown" />
-        <Card className="p-5 sm:p-6 border border-violet-500/30 shadow-lg hover:shadow-2xl hover:border-violet-500/50 transition-all duration-300 bg-gradient-to-br from-violet-500/5 via-slate-900/20 to-background relative overflow-hidden">
+        <Card className="p-5 sm:p-6 border border-violet-500/30 shadow-lg hover:shadow-2xl hover:border-violet-500/50 transition-all duration-300 bg-gradient-to-br from-violet-500/5 via-slate-900/20 to-background relative overflow-hidden w-full">
           <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-violet-500/10 to-transparent rounded-full blur-3xl -z-10" />
           
           <div className="flex items-center justify-between mb-5">
@@ -753,7 +759,7 @@ const Performance = () => {
       {/* SESSION PERFORMANCE */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
         <SectionHeader icon="" title="Session Performance Analysis" />
-        <Card className="p-5 sm:p-6 border border-amber-500/30 shadow-lg hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 bg-gradient-to-br from-amber-500/5 via-slate-900/20 to-background relative overflow-hidden">
+        <Card className="p-5 sm:p-6 border border-amber-500/30 shadow-lg hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 bg-gradient-to-br from-amber-500/5 via-slate-900/20 to-background relative overflow-hidden w-full">
           <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-amber-500/10 to-transparent rounded-full blur-3xl -z-10" />
           
           <div className="flex items-center justify-between mb-5">
@@ -920,7 +926,7 @@ const Performance = () => {
       {/*  SYMBOL & STRATEGY PERFORMANCE MATRIX - SCROLLABLE CARDS */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
         <SectionHeader icon="" title="Symbol & Strategy Performance Matrix" subtitle="See what works for which instrument and setup" />
-        <Card className="p-3 sm:p-6 border border-indigo-500/30 shadow-lg hover:shadow-2xl hover:border-indigo-500/50 transition-all duration-300 bg-gradient-to-br from-indigo-500/5 via-slate-900/20 to-background relative overflow-hidden">
+        <Card className="p-3 sm:p-6 border border-indigo-500/30 shadow-lg hover:shadow-2xl hover:border-indigo-500/50 transition-all duration-300 bg-gradient-to-br from-indigo-500/5 via-slate-900/20 to-background relative overflow-hidden w-full">
           <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full blur-3xl -z-10" />
           
           {symbolStrategyMatrix.length > 0 ? (
@@ -984,7 +990,7 @@ const Performance = () => {
       {/*  MISTAKE COST ANALYSIS */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
         <SectionHeader icon="" title="Mistake Cost Analysis" />
-        <Card className="p-5 sm:p-6 border border-rose-500/30 shadow-lg hover:shadow-2xl hover:border-rose-500/50 transition-all duration-300 bg-gradient-to-br from-rose-500/5 via-slate-900/20 to-background relative overflow-hidden">
+        <Card className="p-5 sm:p-6 border border-rose-500/30 shadow-lg hover:shadow-2xl hover:border-rose-500/50 transition-all duration-300 bg-gradient-to-br from-rose-500/5 via-slate-900/20 to-background relative overflow-hidden w-full">
           <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-rose-500/10 to-transparent rounded-full blur-3xl -z-10" />
           
           <div className="flex items-center justify-between mb-5">
