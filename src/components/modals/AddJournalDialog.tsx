@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { compressImageFileToWebP, uploadJournalImage } from "@/lib/image-utils";
+import { normalizeSymbolKey, formatSymbolDisplay, symbolMatches } from "@/lib/symbol-utils";
 import supabase from "@/lib/supabase";
 
 interface AddJournalDialogProps {
@@ -31,10 +32,11 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
   symbol: "",
   entry_at: nowLocal(),
   exit_at: nowLocal(),
-    session: "London",
+    session: "No Session",
     setup_name: "",
     setup_rating: "B",
     execution_type: "",
+    entry_price: "",
     stop_loss_price: "",
     target_price: "",
     // points-based optional inputs
@@ -54,6 +56,8 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
   });
   const [accounts, setAccounts] = useState<any[]>([]);
   const [symbols, setSymbols] = useState<string[]>([]);
+  const [symbolSearchInput, setSymbolSearchInput] = useState("");
+  const [showSymbolDropdown, setShowSymbolDropdown] = useState(false);
   const [setups, setSetups] = useState<{name: string; description?: string}[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -132,30 +136,244 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
     };
   }, [files]);
 
-  // validate form data
+  // Enhanced validation with comprehensive cross-field checks
   useEffect(() => {
     const errs: Record<string,string> = {};
-    if (!formData.symbol || formData.symbol.trim() === '') errs.symbol = 'Symbol is required';
+    
+    // === REQUIRED FIELDS (All except entry_at, exit_at) ===
+    
+    if (!formData.symbol || formData.symbol.trim() === '') {
+      errs.symbol = 'Symbol is required *';
+    }
+    
+    if (!formData.entry_price || Number(formData.entry_price) === 0) {
+      errs.entry_price = 'Entry price is required *';
+    }
+    
+    if (!formData.direction || formData.direction.trim() === '') {
+      errs.direction = 'Direction (Buy/Sell) is required *';
+    }
+    
+    if (!formData.session || formData.session.trim() === '') {
+      errs.session = 'Session is required *';
+    }
+    
+    if (!formData.setup_name || formData.setup_name.trim() === '') {
+      errs.setup_name = 'Setup name is required *';
+    }
+    
+    if (!formData.setup_rating || formData.setup_rating.trim() === '') {
+      errs.setup_rating = 'Setup rating (A-F) is required *';
+    }
+    
+    if (!formData.execution_type || formData.execution_type.trim() === '') {
+      errs.execution_type = 'Execution type is required *';
+    }
+    
+    if (!formData.result || formData.result.trim() === '') {
+      errs.result = 'Result type is required *';
+    }
+
+    // === OPTIONAL FIELDS (entry_at, exit_at) ===
+    // These are optional, but if both provided, validate they're in order
+    
+    // Cross-field validation: timestamps (only if both provided)
     try {
       if (formData.entry_at && formData.exit_at) {
-        if (new Date(formData.exit_at) <= new Date(formData.entry_at)) errs.time = 'Exit must be after entry';
+        const entry = new Date(formData.entry_at);
+        const exit = new Date(formData.exit_at);
+        if (!isNaN(entry.getTime()) && !isNaN(exit.getTime())) {
+          if (exit <= entry) {
+            errs.time = 'Exit time must be after entry time';
+          }
+        }
       }
     } catch (e) {}
 
+    // === RESULT-DEPENDENT REQUIRED FIELDS ===
+    
     if (formData.result === 'MANUAL') {
-      if (!formData.manualAmount || Number(formData.manualAmount) === 0) errs.manual = 'Enter manual amount';
+      if (!formData.manualAmount || Number(formData.manualAmount) === 0) {
+        errs.manual = 'Manual P&L amount is required *';
+      }
+      if (!formData.manualOutcome || formData.manualOutcome.trim() === '') {
+        errs.manualOutcome = 'Manual outcome (Profit/Loss) is required *';
+      }
     } else if (formData.result === 'TP') {
-      if (!formData.target_price || Number(formData.target_price) === 0) errs.target = 'Enter target amount';
+      if (!formData.target_price || Number(formData.target_price) === 0) {
+        errs.target = 'Target price is required';
+      }
+      if (!formData.target_points || Number(formData.target_points) === 0) {
+        errs.target_points = 'Target points is required';
+      }
     } else if (formData.result === 'SL') {
-      if (!formData.stop_loss_price || Number(formData.stop_loss_price) === 0) errs.stop_loss = 'Enter stop loss amount';
+      if (!formData.stop_loss_price || Number(formData.stop_loss_price) === 0) {
+        errs.stop_loss = 'Stop loss price is required';
+      }
+      if (!formData.stop_loss_points || Number(formData.stop_loss_points) === 0) {
+        errs.stop_loss_points = 'Stop loss points is required';
+      }
     }
+
+    // === STOP LOSS DIRECTION VALIDATION ===
+    // Buy trade: SL must be BELOW entry price (entry_price > stop_loss_price)
+    // Sell trade: SL must be ABOVE entry price (entry_price < stop_loss_price)
+    // Example: Buy at 4650 → SL must be < 4650 (like 4640)
+    
+    try {
+      const entryPrice = parseFloat(formData.entry_price || '0');
+      const slPrice = parseFloat(formData.stop_loss_price || '0');
+      const slPoints = parseFloat(formData.stop_loss_points || '0');
+      
+      // Validate SL Price if both entry and SL are provided
+      if (entryPrice > 0 && slPrice > 0) {
+        if (formData.direction === 'Buy') {
+          // For Buy: SL must be BELOW entry (slPrice < entryPrice)
+          if (slPrice >= entryPrice) {
+            errs.stop_loss_price = `Stop loss (${slPrice}) must be BELOW entry price (${entryPrice}) for Buy trades`;
+          }
+        } else if (formData.direction === 'Sell') {
+          // For Sell: SL must be ABOVE entry (slPrice > entryPrice)
+          if (slPrice <= entryPrice) {
+            errs.stop_loss_price = `Stop loss (${slPrice}) must be ABOVE entry price (${entryPrice}) for Sell trades`;
+          }
+        }
+      }
+      
+      // SL Points direction validation
+      if (entryPrice > 0 && slPoints > 0) {
+        if (formData.direction === 'Buy') {
+          // Buy: SL = Entry - Points (must be positive)
+          const calculatedSL = entryPrice - slPoints;
+          if (calculatedSL <= 0) {
+            errs.stop_loss_points = `Stop loss points (${slPoints}) cannot exceed entry price (${entryPrice}) for Buy trades`;
+          }
+        } else if (formData.direction === 'Sell') {
+          // Sell: SL = Entry + Points (no upper limit needed here)
+          if (slPoints < 0) {
+            errs.stop_loss_points = 'Stop loss points must be positive';
+          }
+        }
+      }
+      
+    } catch (e) {}
+
+    // === TARGET PRICE DIRECTION VALIDATION ===
+    // Buy trade: TP must be ABOVE entry price (target_price > entry_price)
+    // Sell trade: TP must be BELOW entry price (target_price < entry_price)
+    // Example: Buy at 4650 → TP must be > 4650 (like 4670)
+    
+    try {
+      const entryPrice = parseFloat(formData.entry_price || '0');
+      const tpPrice = parseFloat(formData.target_price || '0');
+      const tpPoints = parseFloat(formData.target_points || '0');
+      
+      // Validate TP Price if both entry and TP are provided
+      if (entryPrice > 0 && tpPrice > 0) {
+        if (formData.direction === 'Buy') {
+          // For Buy: TP must be ABOVE entry (tpPrice > entryPrice)
+          if (tpPrice <= entryPrice) {
+            errs.target_price = `Target (${tpPrice}) must be ABOVE entry price (${entryPrice}) for Buy trades`;
+          }
+        } else if (formData.direction === 'Sell') {
+          // For Sell: TP must be BELOW entry (tpPrice < entryPrice)
+          if (tpPrice >= entryPrice) {
+            errs.target_price = `Target (${tpPrice}) must be BELOW entry price (${entryPrice}) for Sell trades`;
+          }
+        }
+      }
+      
+      // TP Points direction validation with immediate feedback
+      if (tpPoints > 0) {
+        // Immediate validation: TP points must be positive
+        if (tpPoints < 0) {
+          errs.target_points = 'Target points must be positive';
+        }
+        
+        // If entry price exists, validate based on direction
+        if (entryPrice > 0) {
+          if (formData.direction === 'Buy') {
+            // Buy: TP = Entry + Points (no upper limit needed)
+            // Just validate points are positive (already done above)
+          } else if (formData.direction === 'Sell') {
+            // Sell: TP = Entry - Points (must result in positive price)
+            const calculatedTP = entryPrice - tpPoints;
+            if (calculatedTP <= 0) {
+              errs.target_points = `❌ Target points (${tpPoints}) exceeds entry (${entryPrice}). Max: ${entryPrice - 0.001}`;
+            }
+          }
+        } else if (entryPrice <= 0 && !errs.target_points) {
+          // Entry price missing but points provided
+          errs.target_points = 'Entry price required to validate target points';
+        }
+      }
+      
+    } catch (e) {}
+
+    // === POINTS-BASED COMPREHENSIVE VALIDATION ===
+    // Real-time validation for SL and TP points with immediate feedback
+    
+    try {
+      const entryPrice = parseFloat(formData.entry_price || '0');
+      const slPoints = parseFloat(formData.stop_loss_points || '0');
+      const tpPoints = parseFloat(formData.target_points || '0');
+      
+      // STOP LOSS POINTS IMMEDIATE VALIDATION
+      if (slPoints > 0) {
+        // Check if points are positive
+        if (slPoints < 0) {
+          errs.stop_loss_points = 'Stop loss points must be positive';
+        }
+        
+        // If entry price exists, validate SL points
+        if (entryPrice > 0) {
+          if (formData.direction === 'Buy') {
+            // Buy: SL = Entry - Points (must result in positive price)
+            const calculatedSL = entryPrice - slPoints;
+            if (calculatedSL <= 0) {
+              errs.stop_loss_points = `❌ SL points (${slPoints}) exceeds entry (${entryPrice}). Max: ${entryPrice - 0.001}`;
+            }
+          } else if (formData.direction === 'Sell') {
+            // Sell: SL = Entry + Points (no upper limit needed)
+            // Just validate points are positive (already done above)
+          }
+        } else if (entryPrice <= 0 && !errs.stop_loss_points) {
+          // Entry price missing but points provided - only show if not already showing required error
+          if (!errs.stop_loss_points || !errs.stop_loss_points.includes('required')) {
+            errs.stop_loss_points = 'Entry price required to validate SL points';
+          }
+        }
+      }
+      
+      // TARGET POINTS IMMEDIATE VALIDATION (supplementary check)
+      if (tpPoints > 0) {
+        if (tpPoints < 0) {
+          if (!errs.target_points) errs.target_points = 'Target points must be positive';
+        }
+        
+        if (entryPrice > 0) {
+          if (formData.direction === 'Sell') {
+            const calculatedTP = entryPrice - tpPoints;
+            if (calculatedTP <= 0 && !errs.target_points) {
+              errs.target_points = `❌ Target points (${tpPoints}) exceeds entry (${entryPrice}). Max: ${entryPrice - 0.001}`;
+            }
+          }
+        } else if (entryPrice <= 0 && !errs.target_points) {
+          // Only show if not already showing required error
+          if (!errs.target_points || !errs.target_points.includes('required')) {
+            errs.target_points = 'Entry price required to validate target points';
+          }
+        }
+      }
+      
+    } catch (e) {}
 
     setErrors(errs);
   }, [formData]);
 
   // Triggered when Save is clicked from the small add-symbol popover
-  const handleAddSymbol = async () => {
-    const raw = addSymInput?.trim();
+  const handleAddSymbol = async (customInput?: string) => {
+    const raw = (customInput || addSymInput)?.trim();
     if (!raw) {
       toast({ title: "Invalid symbol" });
       return;
@@ -207,7 +425,7 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
 
       if (hasNormalized) {
         const payload: any = { name: display, normalized_name: nInput };
-        payload.user_id = userId;
+        // Don't include user_id - symbols are shared across all users
         const { data: insertData, error: insertErr } = await supabase.from('symbols').insert([payload]).select('*');
         if (insertErr) {
           console.warn('Symbol insert error (with normalized_name)', insertErr);
@@ -228,18 +446,10 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
           }
           // retry insert without normalized_name
           const payload2: any = { name: display };
-          payload2.user_id = userId;
+          // Don't include user_id - symbols are shared across all users
           const { data: insertData2, error: insertErr2 } = await supabase.from('symbols').insert([payload2]).select('*');
           if (insertErr2) {
-            // If FK error, try without user_id (symbols table may not require FK association)
-            if (insertErr2.message && insertErr2.message.includes('user_id')) {
-              console.warn('FK constraint on user_id, trying without it', insertErr2.message);
-              const payload3: any = { name: display };
-              const { data: insertData3, error: insertErr3 } = await supabase.from('symbols').insert([payload3]).select('*');
-              if (insertErr3) throw insertErr3;
-            } else {
-              throw insertErr2;
-            }
+            throw insertErr2;
           }
           setSymbols((s) => [display, ...s.filter((x) => normalizeSymbolKey(x) !== nInput)]);
           setFormData((f: any) => ({ ...f, symbol: display }));
@@ -255,18 +465,10 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
         }
       } else {
         const payload: any = { name: display };
-        payload.user_id = userId;
+        // Don't include user_id - symbols are shared across all users
         const { data: insertData, error: insertErr } = await supabase.from('symbols').insert([payload]).select('*');
         if (insertErr) {
-          // If FK error, try without user_id
-          if (insertErr.message && insertErr.message.includes('user_id')) {
-            console.warn('FK constraint on user_id, trying without it', insertErr.message);
-            const payload2: any = { name: display };
-            const { data: insertData2, error: insertErr2 } = await supabase.from('symbols').insert([payload2]).select('*');
-            if (insertErr2) throw insertErr2;
-          } else {
-            throw insertErr;
-          }
+          throw insertErr;
         }
         setSymbols((s) => [display, ...s.filter((x) => normalizeSymbolKey(x) !== nInput)]);
         setFormData((f: any) => ({ ...f, symbol: display }));
@@ -327,6 +529,13 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if there are any validation errors
+    if (Object.keys(errors).length > 0) {
+      toast({ title: "Validation Error", description: "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+    
     setIsUploading(true);
     try {
       const user = (await supabase.auth.getUser()).data?.user;
@@ -485,39 +694,20 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
     setFormData((f:any)=> ({...f, exit_at: timeStr ? `${date}T${timeStr}` : ''}));
   }
 
-  // symbol formatting helpers
-  const normalizeSymbolKey = (s: string) => s.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  const formatSymbolDisplay = (s: string) => {
-    if (!s) return s;
-    // if already contains a slash, normalize spacing and uppercase
-    if (/[\/]/.test(s)) return s.replace(/\s+/g, '').replace(/\\/g, '/').toUpperCase();
-    const raw = normalizeSymbolKey(s);
-    if (raw.length === 6) return `${raw.slice(0,3)}/${raw.slice(3)}`;
-    // fallback: split in the middle if even length > 0
-    if (raw.length > 1 && raw.length % 2 === 0) return `${raw.slice(0, raw.length/2)}/${raw.slice(raw.length/2)}`;
-    return raw;
-  }
-
   // Custom DateTime picker using Popover + Calendar + time list
-  const DateTimePicker = ({ value, onChange, placeholder }: { value?: string; onChange: (iso:string) => void; placeholder?: string }) => {
+  const DateTimePicker = ({ value, onChange, placeholder, hasError }: { value?: string; onChange: (iso:string) => void; placeholder?: string; hasError?: boolean }) => {
     const [open, setOpen] = useState(false);
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(value ? new Date(value) : undefined);
     const [selectedTime, setSelectedTime] = useState<string>(value ? isoToTime(value) : "");
+    const [view, setView] = useState<'date' | 'time'>('date'); // Toggle between date and time view for mobile
 
     useEffect(() => {
       setSelectedDate(value ? new Date(value) : undefined);
       setSelectedTime(value ? isoToTime(value) : "");
-    }, [value]);
+      if (open) setView('date'); // Reset to date view when modal opens
+    }, [value, open]);
 
-    const apply = () => {
-      if (!selectedDate) return;
-      const dateStr = selectedDate.toISOString().slice(0,10);
-      const timeStr = selectedTime || '00:00';
-      onChange(`${dateStr}T${timeStr}`);
-      setOpen(false);
-    }
-
-    // replace numeric inputs with dropdowns (12-hour with AM/PM) and dropdown minutes
+    // 12-hour time format with AM/PM
     const [hour12, setHour12] = useState<string>('12');
     const [minuteSel, setMinuteSel] = useState<string>('00');
     const [meridiem, setMeridiem] = useState<'AM'|'PM'>('AM');
@@ -541,21 +731,30 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
     useEffect(()=>{
       const t = selectedTime || '00:00';
       const parsed = parse24To12(t);
-  setHour12(parsed.h12);
-  setMinuteSel(parsed.m);
-  setMeridiem(parsed.mer as 'AM'|'PM');
+      setHour12(parsed.h12);
+      setMinuteSel(parsed.m);
+      setMeridiem(parsed.mer as 'AM'|'PM');
     }, [selectedTime]);
 
-    const applyWithValidation = () => {
-      if (!selectedDate) { toast({ title: 'No date selected', description: 'Please pick a date first', variant: 'destructive' }); return; }
-      // validate minute and hour
+    const applyDateTime = () => {
+      if (!selectedDate) { 
+        toast({ title: 'No date selected', description: 'Please pick a date first', variant: 'destructive' }); 
+        return; 
+      }
       const okH = /^([1-9]|1[0-2])$/.test(hour12);
       const okM = /^([0-5]\d)$/.test(minuteSel);
-      if (!okH || !okM) { toast({ title: 'Invalid time', description: 'Choose hour and minute from the dropdowns', variant: 'destructive' }); return; }
+      if (!okH || !okM) { 
+        toast({ title: 'Invalid time', description: 'Choose hour and minute from the dropdowns', variant: 'destructive' }); 
+        return; 
+      }
       const t24 = to24(hour12, minuteSel, meridiem);
       const dateStr = selectedDate.toISOString().slice(0,10);
       onChange(`${dateStr}T${t24}`);
       setOpen(false);
+    }
+
+    const goBack = () => {
+      setView('date');
     }
 
     // build minute options (00..59)
@@ -565,46 +764,113 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" className="journal-trigger w-full text-left flex items-center gap-3 bg-transparent border border-white/10 rounded-md px-3 py-2 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-sky-400 transition">
-            <div className="flex-1">
-              <div className="text-sm font-medium text-white">{value ? `${isoToDate(value)} ${isoToTime(value)}` : (placeholder || 'Select date & time')}</div>
-            </div>
-            <div className="text-white text-xs">⏷</div>
+          <button type="button" className={`w-full text-left h-10 px-3 text-sm bg-background/50 text-foreground rounded-lg focus:outline-none focus:ring-2 transition-all hover:border-accent/50 ${
+            hasError 
+              ? 'border-2 border-rose-500 focus:ring-rose-400/50' 
+              : 'border border-border/50 focus:ring-accent focus:border-accent'
+          }`}>
+            {value ? `${isoToDate(value)} ${isoToTime(value)}` : (placeholder || 'Select date & time')}
           </button>
         </PopoverTrigger>
-        <PopoverContent side="bottom" align="start" className="w-[540px]">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <Calendar mode="single" selected={selectedDate} onSelect={(d:any)=> setSelectedDate(d || undefined)} />
-            </div>
-            <div className="w-full sm:w-56">
-              <div className="text-xs font-medium mb-2 text-slate-600 dark:text-slate-300">Time</div>
-              <div className="mb-2">
-                <div className="inline-flex items-center gap-2 p-2 rounded-md border border-white/10 bg-transparent">
-                  <select aria-label="Hour" value={hour12} onChange={(e)=> setHour12(e.target.value)} className="h-10 w-16 rounded-md border-0 px-2 text-white bg-transparent font-medium">
-                    {hourOptions.map(h => <option key={h} value={h} className="text-white">{h}</option>)}
-                  </select>
-                  <div className="text-sm font-medium text-white">:</div>
-                  <select aria-label="Minute" value={minuteSel} onChange={(e)=> setMinuteSel(e.target.value)} className="h-10 w-16 rounded-md border-0 px-2 text-white bg-transparent font-medium">
-                    {minuteOptions.map(m => <option key={m} value={m} className="text-white">{m}</option>)}
-                  </select>
-                </div>
-                <div className="mt-2">
-                  <div className="flex gap-2">
-                    <button type="button" onClick={()=> setMeridiem('AM')} className={`flex-1 h-9 rounded-md ${meridiem==='AM' ? 'bg-sky-600 text-white' : 'border bg-transparent text-white'}`}>AM</button>
-                    <button type="button" onClick={()=> setMeridiem('PM')} className={`flex-1 h-9 rounded-md ${meridiem==='PM' ? 'bg-sky-600 text-white' : 'border bg-transparent text-white'}`}>PM</button>
-                  </div>
-                  </div>
-                </div>
-                <div className="mb-2">
-                <div className="text-xs text-slate-500 dark:text-slate-400">Or type exact time (hh:mm) — it'll sync on Apply.</div>
-                <Input aria-label="Time text" placeholder="HH:MM" value={selectedTime} onChange={(e)=> setSelectedTime(e.target.value)} className="h-10 mt-1 text-white bg-transparent" />
+        <PopoverContent side="bottom" align="center" className="w-auto p-4 z-50">
+          <div className="flex flex-col gap-4" key={`datetime-view-${view}`}>
+            {/* Date Selection - Show on date view */}
+            {view === 'date' && (
+              <div className="flex flex-col space-y-3">
+                <div className="text-sm font-semibold text-accent">📅 Select Date</div>
+                <Calendar 
+                  mode="single" 
+                  selected={selectedDate} 
+                  onSelect={(d:any) => {
+                    setSelectedDate(d || undefined);
+                  }}
+                  className="rounded-lg border border-border/30"
+                />
               </div>
+            )}
+
+            {/* Time Selection - Show on time view */}
+            {view === 'time' && (
+              <div className="w-full flex flex-col space-y-3">
+                <div className="text-sm font-semibold text-accent">⏰ Select Time</div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Hour</label>
+                    <select 
+                      value={hour12} 
+                      onChange={(e)=> setHour12(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp') { e.preventDefault(); const idx = hourOptions.indexOf(hour12); if (idx > 0) setHour12(hourOptions[idx-1]); }
+                        if (e.key === 'ArrowDown') { e.preventDefault(); const idx = hourOptions.indexOf(hour12); if (idx < hourOptions.length-1) setHour12(hourOptions[idx+1]); }
+                      }}
+                      className="w-full h-10 px-2 text-sm rounded-lg border-2 border-border/40 bg-background text-foreground font-medium focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all hover:border-border/60 cursor-pointer"
+                    >
+                      {hourOptions.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Min</label>
+                    <select 
+                      value={minuteSel} 
+                      onChange={(e)=> setMinuteSel(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp') { e.preventDefault(); const idx = minuteOptions.indexOf(minuteSel); if (idx > 0) setMinuteSel(minuteOptions[idx-1]); }
+                        if (e.key === 'ArrowDown') { e.preventDefault(); const idx = minuteOptions.indexOf(minuteSel); if (idx < minuteOptions.length-1) setMinuteSel(minuteOptions[idx+1]); }
+                      }}
+                      className="w-full h-10 px-2 text-sm rounded-lg border-2 border-border/40 bg-background text-foreground font-medium focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all hover:border-border/60 cursor-pointer"
+                    >
+                      {minuteOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Period</label>
+                    <select 
+                      value={meridiem} 
+                      onChange={(e)=> setMeridiem(e.target.value as 'AM'|'PM')}
+                      className="w-full h-10 px-2 text-sm rounded-lg border-2 border-border/40 bg-background text-foreground font-medium focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all hover:border-border/60 cursor-pointer"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons - Apply/Back style */}
+            <div className="flex gap-2 pt-2 justify-between flex-wrap">
+              {view === 'time' && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={goBack} 
+                  className="text-xs font-medium border-border/50 hover:bg-background/80"
+                >
+                  ← Back
+                </Button>
+              )}
+              {view === 'date' && (
+                <div className="w-full" />
+              )}
+              {view === 'date' && selectedDate && (
+                <Button 
+                  size="sm" 
+                  onClick={() => setView('time')} 
+                  className="bg-accent hover:bg-accent/90 text-xs font-medium whitespace-nowrap text-white"
+                >
+                  Next: Time →
+                </Button>
+              )}
+              {view === 'time' && (
+                <Button 
+                  size="sm" 
+                  onClick={applyDateTime} 
+                  className="bg-emerald-600 hover:bg-emerald-700 text-xs font-medium whitespace-nowrap text-white"
+                >
+                  Apply ✓
+                </Button>
+              )}
             </div>
-          </div>
-          <div className="mt-3 flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={applyWithValidation}>Apply</Button>
           </div>
         </PopoverContent>
       </Popover>
@@ -613,7 +879,7 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-  <DialogContent className="glass-strong w-full max-w-3xl sm:max-w-2xl md:max-w-xl lg:max-w-2xl max-h-[90vh] overflow-hidden border border-border/40 p-4 sm:p-6">
+  <DialogContent className="glass-strong w-full max-w-3xl sm:max-w-2xl md:max-w-xl lg:max-w-2xl max-h-[90vh] overflow-hidden border border-border/40 p-0 flex flex-col">
         <style>{`.journal-dt input[type="date"], .journal-dt input[type="time"]{ -webkit-appearance: none; appearance: none; }
 .journal-dt input::-webkit-calendar-picker-indicator{ filter: grayscale(40%) brightness(0.6); opacity:0.9 }
 .journal-dt .picker-input{ z-index:50 }
@@ -621,80 +887,170 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 `}</style>
-        <DialogHeader className="pb-2">
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-border/30 flex-shrink-0">
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">Add Trade Entry</DialogTitle>
           <DialogDescription className="text-sm">Log your trade details to build your trading journal</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="max-h-[calc(90vh-160px)] overflow-y-auto hide-scrollbar pr-3 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 flex flex-col flex-1 overflow-hidden">
+          <div className="overflow-y-auto flex-1 hide-scrollbar px-4 sm:px-6 py-4 space-y-6">
+            <div className="max-w-2xl mx-auto w-full">
           
           {/* Section 1: Trade Basics - Symmetric Layout */}
           <div className="bg-background/40 rounded-xl p-5 border border-border/30 space-y-4">
             <div className="text-sm font-semibold text-accent mb-3"> Trade Setup</div>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Symbol */}
+              {/* Symbol with Save Button */}
               <div className="flex flex-col space-y-2">
-                <Label className="text-xs font-semibold text-muted-foreground">Symbol</Label>
-                <div className="flex gap-2">
-                  <select
-                    className="flex-1 h-10 px-3 text-sm bg-background/50 text-foreground border border-border/50 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all"
-                    value={formData.symbol}
-                    onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
-                  >
-                    <option value="">Select...</option>
-                    {symbols.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  <Popover open={addSymOpen} onOpenChange={setAddSymOpen}>
-                    <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" size="sm" className="h-10 border-border/50 hover:bg-accent/20">➕</Button>
-                    </PopoverTrigger>
-                    <PopoverContent side="bottom" align="start" className="w-[280px] glass-strong border-border/40">
-                      <div className="flex flex-col gap-3">
-                        <div className="text-sm font-semibold">Add Symbol</div>
-                        <input value={addSymInput} onChange={(e) => setAddSymInput(e.target.value)} placeholder="e.g. EUR/USD" className="h-10 px-3 rounded-lg border border-border/50 bg-background/50 text-foreground focus:outline-none focus:ring-2 focus:ring-accent" />
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => { setAddSymOpen(false); setAddSymInput(''); }}>Cancel</Button>
-                          <Button size="sm" className="bg-accent hover:bg-accent/90" onClick={handleAddSymbol}>Save</Button>
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs font-semibold text-muted-foreground">
+                    Symbol
+                  </Label>
+                  <span className="text-rose-500 font-bold">*</span>
+                  {errors.symbol && <span className="text-rose-400 text-xs ml-auto flex items-center gap-1">⚠️ Required</span>}
                 </div>
-                {errors.symbol && <div className="text-rose-400 text-xs">{errors.symbol}</div>}
+                <div className="flex gap-2 items-start">
+                  <div className="flex-1 flex flex-col space-y-2">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search symbol (EUR/USD, GOLD, etc)..."
+                        value={formData.symbol || symbolSearchInput}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData({ ...formData, symbol: value });
+                          setSymbolSearchInput(value);
+                          // Only show dropdown if there's a matching letter/symbol
+                          const trimmed = value.trim();
+                          if (trimmed.length > 0) {
+                            const hasMatches = symbols.some(s => 
+                              symbolMatches(s, trimmed) || 
+                              s.toLowerCase().includes(trimmed.toLowerCase())
+                            );
+                            setShowSymbolDropdown(hasMatches);
+                          } else {
+                            setShowSymbolDropdown(false);
+                          }
+                        }}
+                        onBlur={() => setTimeout(() => setShowSymbolDropdown(false), 200)}
+                        className={`w-full h-10 px-3 pr-8 text-sm bg-background/50 text-foreground rounded-lg focus:outline-none focus:ring-2 transition-all ${
+                          errors.symbol 
+                            ? 'border-2 border-rose-500 focus:ring-rose-400/50' 
+                            : 'border border-border/50 focus:ring-accent focus:border-accent'
+                        }`}
+                      />
+                      {/* Clear button */}
+                      {symbolSearchInput && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSymbolSearchInput("");
+                            setShowSymbolDropdown(false);
+                          }}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          ✕
+                        </button>
+                      )}
+                      {/* Live Dropdown - Only shows if matching symbols exist */}
+                      {showSymbolDropdown && symbolSearchInput.trim().length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-background/95 border border-accent/40 rounded-lg shadow-lg z-50">
+                          {symbols
+                            .filter((s) =>
+                              symbolMatches(s, symbolSearchInput) || 
+                              s.toLowerCase().includes(symbolSearchInput.toLowerCase())
+                            )
+                            .slice(0, 10)
+                            .map((s) => (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() => {
+                                  setFormData({ ...formData, symbol: s });
+                                  setSymbolSearchInput("");
+                                  setShowSymbolDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-accent/30 text-sm text-foreground border-b border-border/30 last:border-b-0 transition-colors"
+                              >
+                                <span className="font-medium">{s}</span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Save Button - Appears when symbol is typed AND not found in list */}
+                  {symbolSearchInput && 
+                   !symbols.some(s => s.toLowerCase() === symbolSearchInput.toLowerCase()) && (
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      className="h-10 bg-accent hover:bg-accent/90 text-white font-medium mt-0 flex-shrink-0"
+                      onClick={() => {
+                        const trimmed = symbolSearchInput.trim();
+                        if (trimmed) {
+                          handleAddSymbol(trimmed);
+                          setSymbolSearchInput("");
+                        }
+                      }}
+                    >
+                      💾 Save
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* Entry Time */}
               <div className="flex flex-col space-y-2">
-                <Label className="text-xs font-semibold text-muted-foreground">Entry Time</Label>
-                <DateTimePicker value={formData.entry_at} onChange={(iso)=> setFormData((f:any)=>({...f, entry_at: iso}))} placeholder="Entry" />
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs font-semibold text-muted-foreground">Entry Time</Label>
+                  {errors.entry_at && <span className="text-rose-400 text-xs ml-auto">⚠️</span>}
+                </div>
+                <DateTimePicker value={formData.entry_at} onChange={(iso)=> setFormData((f:any)=>({...f, entry_at: iso}))} placeholder="Entry" hasError={!!errors.entry_at} />
+                {errors.entry_at && <div className="text-rose-400 text-xs flex items-center gap-1"><span>⚠️</span><span>{errors.entry_at}</span></div>}
               </div>
 
               {/* Exit Time */}
               <div className="flex flex-col space-y-2">
-                <Label className="text-xs font-semibold text-muted-foreground">Exit Time</Label>
-                <DateTimePicker value={formData.exit_at} onChange={(iso)=> setFormData((f:any)=>({...f, exit_at: iso}))} placeholder="Exit" />
-                {errors.time && <div className="text-rose-400 text-xs">{errors.time}</div>}
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs font-semibold text-muted-foreground">Exit Time</Label>
+                  {errors.exit_at && <span className="text-rose-400 text-xs ml-auto">⚠️</span>}
+                </div>
+                <DateTimePicker value={formData.exit_at} onChange={(iso)=> setFormData((f:any)=>({...f, exit_at: iso}))} placeholder="Exit" hasError={!!errors.exit_at} />
+                {errors.exit_at && <div className="text-rose-400 text-xs flex items-center gap-1"><span>⚠️</span><span>{errors.exit_at}</span></div>}
+                {errors.time && <div className="text-rose-400 text-xs flex items-center gap-1"><span>⚠️</span><span>{errors.time}</span></div>}
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="flex flex-col space-y-2">
-                <Label className="text-xs font-semibold text-muted-foreground">Direction</Label>
-                <select className="h-10 px-3 text-sm bg-background/50 text-foreground border border-border/50 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent" value={formData.direction} onChange={(e) => setFormData({ ...formData, direction: e.target.value })}>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs font-semibold text-muted-foreground">Direction</Label>
+                  <span className="text-rose-500 font-bold">*</span>
+                  {errors.direction && <span className="text-rose-400 text-xs">⚠️</span>}
+                </div>
+                <select className={`h-10 px-3 text-sm bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent transition-all ${
+                  errors.direction
+                    ? 'border-2 border-rose-500'
+                    : 'border border-border/50'
+                }`} value={formData.direction} onChange={(e) => setFormData({ ...formData, direction: e.target.value })}>
                   <option>Buy</option>
                   <option>Sell</option>
                 </select>
+                {errors.direction && (
+                  <div className="flex items-center gap-1 text-rose-400 text-xs">
+                    <span>⚠️</span>
+                    <span>{errors.direction}</span>
+                  </div>
+                )}
               </div>
               <div className="col-span-2 flex flex-col space-y-2">
                 <Label className="text-xs font-semibold text-muted-foreground">Duration <span className="text-accent text-xs">(Auto-calculated)</span></Label>
                 {durationMinutes ? (
                   <div className="h-10 flex items-center px-3 rounded-lg bg-gradient-to-r from-accent/15 to-accent/10 border border-accent/40 relative overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-accent/5 to-transparent opacity-50"></div>
-                    <span className="text-sm font-semibold text-accent relative z-10">⏱️ {Math.floor(durationMinutes/60)}h {durationMinutes%60}m</span>
+                    <span className="text-sm font-semibold text-accent relative z-10">{Math.floor(durationMinutes/60)}h {durationMinutes%60}m</span>
                   </div>
                 ) : (
                   <div className="h-10 flex items-center px-3 rounded-lg bg-background/50 border border-border/30 border-dashed text-muted-foreground text-xs">
@@ -707,24 +1063,49 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="flex flex-col space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground">Session</Label>
-              <select className="h-10 px-3 text-sm bg-background/50 text-foreground border border-border/50 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent" value={formData.session} onChange={(e) => setFormData({ ...formData, session: e.target.value })}>
+              <div className="flex items-center gap-1">
+                <Label className="text-xs font-semibold text-muted-foreground">Session</Label>
+                <span className="text-rose-500 font-bold">*</span>
+                {errors.session && <span className="text-rose-400 text-xs">⚠️</span>}
+              </div>
+              <select className={`h-10 px-3 text-sm bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent transition-all ${
+                errors.session
+                  ? 'border-2 border-rose-500'
+                  : 'border border-border/50'
+              }`} value={formData.session} onChange={(e) => setFormData({ ...formData, session: e.target.value })}>
+                <option>No Session</option>
                 <option>London</option>
-                <option>NY</option>
                 <option>Asia</option>
-                
+                <option>New York</option>
+                <option>London Killzone</option>
+                <option>Asia Killzone</option>
+                <option>New York Killzone</option>
               </select>
+              {errors.session && (
+                <div className="flex items-center gap-1 text-rose-400 text-xs">
+                  <span>⚠️</span>
+                  <span>{errors.session}</span>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col space-y-2 col-span-2">
-              <Label className="text-xs font-semibold text-muted-foreground">Setup Name</Label>
+              <div className="flex items-center gap-1">
+                <Label className="text-xs font-semibold text-muted-foreground">Setup Name</Label>
+                <span className="text-rose-500 font-bold">*</span>
+                {errors.setup_name && <span className="text-rose-400 text-xs">⚠️</span>}
+              </div>
               <div className="flex gap-2 items-start">
                 <div className="flex-1">
                   <div className="relative">
                     <select 
                       value={formData.setup_name || ''} 
                       onChange={(e) => setFormData({ ...formData, setup_name: e.target.value })}
-                      className="w-full h-10 px-3 pr-10 text-sm bg-background/50 text-foreground border border-border/50 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors cursor-pointer"
+                      className={`w-full h-10 px-3 pr-10 text-sm bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors cursor-pointer ${
+                        errors.setup_name
+                          ? 'border-2 border-rose-500'
+                          : 'border border-border/50'
+                      }`}
                     >
                       <option value="">Select or create setup...</option>
                       {setups.map((s) => (
@@ -753,14 +1134,18 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
             </div>
 
             <div className="flex flex-col space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground">Setup Rating</Label>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-1">
+                <Label className="text-xs font-semibold text-muted-foreground">Setup Rating</Label>
+                <span className="text-rose-500 font-bold">*</span>
+                {errors.setup_rating && <span className="text-rose-400 text-xs">⚠️</span>}
+              </div>
+              <div className="flex gap-1 sm:gap-2">
                 {['B', 'B+', 'A-', 'A', 'A+'].map((rating) => (
                   <button
                     key={rating}
                     type="button"
                     onClick={() => setFormData({ ...formData, setup_rating: rating })}
-                    className={`flex-1 h-10 rounded-lg font-semibold text-sm transition-all ${
+                    className={`flex-1 h-8 sm:h-10 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
                       formData.setup_rating === rating
                         ? 'bg-accent/40 border border-accent/50 text-accent'
                         : 'bg-background/50 border border-border/50 text-muted-foreground hover:border-accent/30'
@@ -770,14 +1155,28 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                   </button>
                 ))}
               </div>
+              {errors.setup_rating && (
+                <div className="flex items-center gap-1 text-rose-400 text-xs">
+                  <span>⚠️</span>
+                  <span>{errors.setup_rating}</span>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground">Execution Type</Label>
+              <div className="flex items-center gap-1">
+                <Label className="text-xs font-semibold text-muted-foreground">Execution Type</Label>
+                <span className="text-rose-500 font-bold">*</span>
+                {errors.execution_type && <span className="text-rose-400 text-xs">⚠️</span>}
+              </div>
               <div className="relative">
-                <select className="w-full h-10 px-3 pr-10 text-sm bg-background/50 text-foreground border border-border/50 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors cursor-pointer" value={formData.execution_type} onChange={(e) => setFormData({ ...formData, execution_type: e.target.value })}>
+                <select className={`w-full h-10 px-3 pr-10 text-sm bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors cursor-pointer ${
+                  errors.execution_type
+                    ? 'border-2 border-rose-500'
+                    : 'border border-border/50'
+                }`} value={formData.execution_type} onChange={(e) => setFormData({ ...formData, execution_type: e.target.value })}>
                   <option value="">Market</option>
                   <option>Limit</option>
                   <option>Stop</option>
@@ -788,53 +1187,57 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                   </svg>
                 </div>
               </div>
+              {errors.execution_type && (
+                <div className="flex items-center gap-1 text-rose-400 text-xs">
+                  <span>⚠️</span>
+                  <span>{errors.execution_type}</span>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground">Result</Label>
-              <div className="relative">
-                <select className="w-full h-10 px-3 pr-10 text-sm bg-background/50 text-foreground border border-border/50 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors cursor-pointer" value={formData.result} onChange={(e) => setFormData({ ...formData, result: e.target.value })}>
-                  <option value="TP">✅ Take Profit</option>
-                  <option value="SL">❌ Stop Loss</option>
-                  <option value="BREAKEVEN">⚖️ Breakeven</option>
-                  <option value="MANUAL">📝 Manual Exit</option>
-                </select>
-                <div className="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
-                </div>
+              <div className="flex items-center gap-1">
+                <Label className="text-xs font-semibold text-muted-foreground">Entry Price</Label>
+                <span className="text-rose-500 font-bold">*</span>
+                {errors.entry_price && <span className="text-rose-400 text-xs">⚠️</span>}
               </div>
+              <Input 
+                type="number" 
+                step="0.01" 
+                value={formData.entry_price} 
+                onChange={(e) => setFormData({ ...formData, entry_price: e.target.value })} 
+                placeholder="0.00"
+                className={`h-10 px-3 text-sm bg-background/50 text-blue-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all ${
+                  errors.entry_price
+                    ? 'border-2 border-rose-500'
+                    : 'border border-blue-400/30'
+                }`}
+              />
+              {errors.entry_price && (
+                <div className="flex items-center gap-1 text-rose-400 text-xs">
+                  <span>⚠️</span>
+                  <span>{errors.entry_price}</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {formData.result === "MANUAL" && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col">
-                <Label className="mb-1">Manual outcome</Label>
-                <select className="h-10 px-3 text-sm bg-transparent text-white border border-white/20 rounded-md appearance-none" value={formData.manualOutcome} onChange={(e) => setFormData({ ...formData, manualOutcome: e.target.value })}>
-                  <option value="Profit">Profit</option>
-                  <option value="Loss">Loss</option>
-                </select>
-              </div>
-              <div className="flex flex-col">
-                <Label className="mb-1">Manual amount</Label>
-                <Input className="h-10 px-3 text-sm bg-transparent text-white border border-white/20 rounded-md" type="number" step="0.01" value={formData.manualAmount} onChange={(e) => setFormData({ ...formData, manualAmount: e.target.value })} />
-              </div>
-            </div>
-          )}
-
-
           {/* Section 3: P&L & Risk Management */}
           <div className="bg-background/40 rounded-xl p-5 border border-border/30 space-y-4">
-            <div className="text-sm font-semibold text-accent mb-3">💰 P&L & Risk</div>
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-semibold text-accent">P&L & Risk</div>
+              <span className="text-rose-500 font-bold text-xs">* (SL/TP Points & Amount required)</span>
+            </div>
             
             {/* Amount-based P&L */}
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col space-y-2">
-                <Label className="text-xs font-semibold text-rose-400">Stop Loss ($$)</Label>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs font-semibold text-rose-400">Stop Loss ($$)</Label>
+                  <span className="text-rose-400 text-xs">⚠️</span>
+                </div>
                 <Input 
-                  className="h-10 px-3 text-sm bg-background/50 text-rose-400 border border-rose-400/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50" 
+                  className={`h-10 px-3 text-sm bg-background/50 text-rose-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 transition-all border-2 border-rose-500`} 
                   type="number" 
                   step="0.01" 
                   value={formData.stop_loss_price} 
@@ -842,12 +1245,18 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                   disabled={formData.result === "MANUAL"} 
                   placeholder="0.00"
                 />
-                {errors.stop_loss && <div className="text-rose-400 text-xs">{errors.stop_loss}</div>}
               </div>
               <div className="flex flex-col space-y-2">
-                <Label className="text-xs font-semibold text-emerald-400">Target ($$)</Label>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs font-semibold text-emerald-400">Target ($$)</Label>
+                  {errors.target && <span className="text-rose-400 text-xs">⚠️</span>}
+                </div>
                 <Input 
-                  className="h-10 px-3 text-sm bg-background/50 text-emerald-400 border border-emerald-400/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/50" 
+                  className={`h-10 px-3 text-sm bg-background/50 text-emerald-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all ${
+                    errors.target 
+                      ? 'border-2 border-rose-500' 
+                      : 'border border-emerald-400/30'
+                  }`} 
                   type="number" 
                   step="0.01" 
                   value={formData.target_price} 
@@ -855,30 +1264,45 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                   disabled={formData.result === "MANUAL"}
                   placeholder="0.00"
                 />
-                {errors.target && <div className="text-rose-400 text-xs">{errors.target}</div>}
               </div>
             </div>
 
             {/* Points-based P&L */}
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col space-y-2">
-                <Label className="text-xs font-semibold text-rose-400">Stop Loss (pts)</Label>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-semibold text-rose-400">Stop Loss (pts)</Label>
+                  <span className="text-rose-400 text-xs">⚠️</span>
+                </div>
                 <Input
                   type="number"
                   step="0.1"
-                  className="h-10 px-3 text-sm bg-background/50 text-rose-400 border border-rose-400/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50"
+                  className={`h-10 px-3 text-sm bg-background/50 text-rose-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 transition-all border-2 border-rose-500`}
                   value={formData.stop_loss_points}
                   onChange={(e)=> setFormData({...formData, stop_loss_points: e.target.value})}
                   disabled={formData.result === "MANUAL"}
                   placeholder="0.0"
                 />
+                {errors.stop_loss_points && (
+                  <div className="flex items-center gap-1 text-rose-400 text-xs">
+                    <span>⚠️</span>
+                    <span>{errors.stop_loss_points}</span>
+                  </div>
+                )}
               </div>
               <div className="flex flex-col space-y-2">
-                <Label className="text-xs font-semibold text-emerald-400">Target (pts)</Label>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-semibold text-emerald-400">Target (pts)</Label>
+                  {errors.target_points && <span className="text-rose-400 text-xs">⚠️</span>}
+                </div>
                 <Input
                   type="number"
                   step="0.1"
-                  className="h-10 px-3 text-sm bg-background/50 text-emerald-400 border border-emerald-400/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
+                  className={`h-10 px-3 text-sm bg-background/50 text-emerald-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400/50 transition-all ${
+                    errors.target_points 
+                      ? 'border-2 border-rose-500' 
+                      : 'border border-emerald-400/30'
+                  }`}
                   value={formData.target_points}
                   onChange={(e)=> setFormData({...formData, target_points: e.target.value})}
                   disabled={formData.result === "MANUAL"}
@@ -888,8 +1312,103 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
             </div>
           </div>
 
+          {/* Section 3.5: Result */}
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center gap-1">
+                <Label className="text-xs font-semibold text-muted-foreground">Result</Label>
+                <span className="text-rose-500 font-bold">*</span>
+                {errors.result && <span className="text-rose-400 text-xs">⚠️</span>}
+              </div>
+              <div className="relative">
+                <select className={`w-full h-10 px-3 pr-10 text-sm bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors cursor-pointer ${
+                  errors.result
+                    ? 'border-2 border-rose-500'
+                    : 'border border-border/50'
+                }`} value={formData.result} onChange={(e) => setFormData({ ...formData, result: e.target.value })}>
+                  <option value="TP">Take Profit</option>
+                  <option value="SL">❌ Stop Loss</option>
+                  <option value="BREAKEVEN">Breakeven</option>
+                  <option value="MANUAL">Manual Exit</option>
+                </select>
+                <div className="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </div>
+              </div>
+              {errors.result && (
+                <div className="flex items-center gap-1 text-rose-400 text-xs">
+                  <span>⚠️</span>
+                  <span>{errors.result}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {formData.result === "MANUAL" && (
+            <div className="bg-background/40 rounded-xl p-5 border border-accent/40 space-y-4 mt-8">
+              <div className="text-sm font-semibold text-accent mb-3">Manual Exit Details</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs font-semibold text-muted-foreground">Outcome</Label>
+                    <span className="text-rose-500 font-bold">*</span>
+                    {errors.manualOutcome && <span className="text-rose-400 text-xs">⚠️</span>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, manualOutcome: "Profit" })}
+                      className={`h-10 px-3 rounded-lg font-semibold text-sm transition-all ${
+                        formData.manualOutcome === "Profit"
+                          ? 'bg-emerald-500/40 border border-emerald-400/50 text-emerald-400'
+                          : 'bg-background/50 border border-border/50 text-muted-foreground hover:border-emerald-400/30'
+                      }`}
+                    >
+                      ✓ Profit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, manualOutcome: "Loss" })}
+                      className={`h-10 px-3 rounded-lg font-semibold text-sm transition-all ${
+                        formData.manualOutcome === "Loss"
+                          ? 'bg-rose-500/40 border border-rose-400/50 text-rose-400'
+                          : 'bg-background/50 border border-border/50 text-muted-foreground hover:border-rose-400/30'
+                      }`}
+                    >
+                      ✕ Loss
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs font-semibold text-muted-foreground">P&L Amount ($)</Label>
+                    <span className="text-rose-500 font-bold">*</span>
+                    {errors.manual && <span className="text-rose-400 text-xs">⚠️</span>}
+                  </div>
+                  <Input 
+                    type="number" 
+                    step="0.01"
+                    value={formData.manualAmount} 
+                    onChange={(e) => setFormData({ ...formData, manualAmount: e.target.value })} 
+                    placeholder="Enter amount..."
+                    className={`h-10 px-3 text-sm bg-background/50 rounded-lg focus:outline-none focus:ring-2 transition-all ${
+                      errors.manual
+                        ? 'border-2 border-rose-500'
+                        : formData.manualOutcome === "Profit"
+                        ? 'text-emerald-400 border border-emerald-400/30 focus:ring-emerald-400/50'
+                        : 'text-rose-400 border border-rose-400/30 focus:ring-rose-400/50'
+                    }`}
+                  />
+                  {errors.manual && <div className="text-rose-400 text-xs flex items-center gap-1"><span>⚠️</span><span>{errors.manual}</span></div>}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Section 4: Trade Quality */}
-          <div className="bg-background/40 rounded-xl p-5 border border-border/30 space-y-4">
+          <div className="bg-background/40 rounded-xl p-5 border border-border/30 space-y-4 mt-8">
             <div className="text-sm font-semibold text-accent mb-3"> Trade Quality</div>
             
             <div className="grid grid-cols-2 gap-4">
@@ -903,25 +1422,27 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
               </div>
             </div>
 
-            <div className="flex flex-col space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground">Loss Reason (if SL)</Label>
-              <input 
-                list="loss-reason-list" 
-                className="h-10 px-3 text-sm bg-background/50 text-foreground border border-border/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" 
-                value={formData.loss_reason} 
-                onChange={(e)=> setFormData({...formData, loss_reason: e.target.value})} 
-                placeholder="Select or type..."
-              />
-              <datalist id="loss-reason-list">
-                <option>Early entry</option>
-                <option>Late entry</option>
-                <option>Rushed entry</option>
-                <option>Wrong bias</option>
-                <option>No confirmation</option>
-                <option>News volatility</option>
-                <option>Other</option>
-              </datalist>
-            </div>
+            {formData.result === 'SL' && (
+              <div className="flex flex-col space-y-2">
+                <Label className="text-xs font-semibold text-rose-400">Loss Reason</Label>
+                <input 
+                  list="loss-reason-list" 
+                  className="h-10 px-3 text-sm bg-background/50 text-foreground border border-rose-400/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50" 
+                  value={formData.loss_reason} 
+                  onChange={(e)=> setFormData({...formData, loss_reason: e.target.value})} 
+                  placeholder="Select or type reason..."
+                />
+                <datalist id="loss-reason-list">
+                  <option>Early entry</option>
+                  <option>Late entry</option>
+                  <option>Rushed entry</option>
+                  <option>Wrong bias</option>
+                  <option>No confirmation</option>
+                  <option>News volatility</option>
+                  <option>Other</option>
+                </datalist>
+              </div>
+            )}
           </div>
 
 
@@ -993,11 +1514,22 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
             </div>
           </div>
 
-          </div>
+            </div>
+            </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={isUploading || Object.keys(errors).length > 0}>{isUploading ? 'Saving...' : 'Add Entry'}</Button>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 px-4 sm:px-6 py-4 border-t border-border/30 flex-shrink-0 bg-gradient-to-t from-background/80 to-transparent">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Cancel</Button>
+            <Button 
+              type="submit" 
+              disabled={isUploading || Object.keys(errors).length > 0} 
+              className={`w-full sm:w-auto font-semibold text-base py-2 ${
+                Object.keys(errors).length > 0 
+                  ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 text-white shadow-lg'
+              }`}
+            >
+              {isUploading ? 'Saving...' : '+ Add Entry'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -1037,7 +1569,7 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
               <p className="text-xs text-muted-foreground">Optional: helps you remember what makes this setup unique</p>
             </div>
           </div>
-          <DialogFooter className="gap-2">
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
             <Button 
               type="button" 
               variant="outline" 
@@ -1046,12 +1578,13 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                 setNewSetupInput('');
                 setNewSetupDescription('');
               }}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button 
               type="button"
-              className="bg-accent hover:bg-accent/90"
+              className="w-full sm:w-auto bg-accent hover:bg-accent/90"
               onClick={handleAddSetup}
             >
               Save Setup

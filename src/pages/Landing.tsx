@@ -110,23 +110,24 @@ const Landing = () => {
               <Typewriter
                 options={{
                   strings: [
-                    "Journal Your Trades With Clarity",
-                    "Manage Your Prop Firms in One Place",
-                    "Track Every Prop Firm Account Effortlessly",
-                    "Be a More Disciplined, Profitable Trader",
+                    "Journal Trades",
+                    "Track Performance",
+                    "Analyze Results",
+                    "Improve Strategy",
+                    "Manage Accounts",
+                    "Trade Smarter",
                   ],
                   autoStart: true,
                   loop: true,
-                  delay: 55,
-                  deleteSpeed: 40,
+                  delay: 50,
+                  deleteSpeed: 35,
                 }}
               />
             </h1>
 
             {/* updated but same position/size as before */}
-            <h2 className="text-sm md:text-base lg:text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Journal trades, manage prop firm accounts, track payouts and risk – all in a
-              single clean dashboard built for funded traders.
+            <h2 className="hidden sm:block text-sm md:text-base lg:text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+              Journal trades, manage accounts, track performance – all in one dashboard.
             </h2>
 
             <p className="text-base md:text-lg lg:text-xl text-muted-foreground mb-12 max-w-3xl mx-auto">

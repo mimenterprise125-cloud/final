@@ -92,14 +92,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           filter: 'id=eq.default',
         },
         (payload) => {
-          console.log('🔄 Admin settings changed via realtime:', payload);
+          //console.log('', payload);
           // mark realtime as seen and refetch silently
           lastRealtimeAt.current = Date.now();
           fetchAdminSettings(false);
         }
       )
       .subscribe((status) => {
-        console.log('📡 Realtime subscription status:', status);
+        //console.log('📡 Realtime subscription status:', status);
       });
 
     // Conservative polling fallback: if no realtime event seen, poll every 10s
@@ -109,7 +109,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const now = Date.now();
         // If we've never seen a realtime event or it's been >10s since last one, refetch
         if (!lastRealtimeAt.current || now - lastRealtimeAt.current > 10000) {
-          console.log('� Polling fallback: fetching admin settings (no recent realtime)');
+          //console.log('� Polling fallback: fetching admin settings (no recent realtime)');
           fetchAdminSettings(false);
         }
       } catch (err) {
@@ -140,7 +140,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .select('*')
         .single();
 
-      console.log('📥 Fetched admin settings from database:', data);
+      //console.log('📥 Fetched admin settings from database:', data);
 
       // If table doesn't exist (406) or no data found (PGRST116), just use defaults
       if (fetchError && fetchError.code !== 'PGRST116') {
@@ -148,7 +148,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       if (data) {
-        console.log('✓ Lock status - propfirm_locked:', data.propfirm_locked, 'journal_locked:', data.journal_locked);
+        //console.log('✓ Lock status - propfirm_locked:', data.propfirm_locked, 'journal_locked:', data.journal_locked);
         setAdminSettings({
           pricing_enabled: data.pricing_enabled || false,
           pricing_tiers: data.pricing_tiers || [],

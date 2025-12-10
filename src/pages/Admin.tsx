@@ -811,30 +811,13 @@ const Admin = () => {
                 </p>
 
                 <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-center">
-                  <div className="flex-1 min-w-max">
-                    <label className="text-sm text-gray-300 mb-2 block">
-                      Maintenance Window Duration (minutes)
-                    </label>
-                    <input
-                      type="number"
-                      value={adminSettings.maintenance_window_duration}
-                      onChange={(e) => {
-                        const duration = Math.max(1, parseInt(e.target.value) || 120);
-                        updateSettings({ maintenance_window_duration: duration });
-                      }}
-                      min="1"
-                      max="1440"
-                      className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-center"
-                      placeholder="Duration in minutes"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      ({Math.floor(adminSettings.maintenance_window_duration / 60)}h {adminSettings.maintenance_window_duration % 60}m)
-                    </p>
-                  </div>
                 </div>
 
                 <Button
-                  onClick={() => toggleMaintenanceMode()}
+                  onClick={() => {
+                    console.log('🔘 Maintenance Mode button clicked!');
+                    toggleMaintenanceMode();
+                  }}
                   size="lg"
                   className={`${
                     adminSettings.maintenance_mode

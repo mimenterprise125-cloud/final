@@ -8,20 +8,55 @@ import { motion } from 'framer-motion'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { TrendingUp, TrendingDown, Target, AlertCircle, Zap, Lightbulb, CheckCircle2, AlertTriangle } from 'lucide-react'
 import UnderDevelopment from '@/components/UnderDevelopment'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 
 const MetricCard = ({ title, value, hint, icon: Icon, trend }: { title: string; value: string | number; hint?: string; icon?: any; trend?: 'up' | 'down' | 'neutral' }) => {
   const trendColor = trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-muted-foreground'
+  
+  // Determine gradient color based on trend
+  const gradientColor = trend === 'up' ? 'emerald' : trend === 'down' ? 'rose' : 'primary'
+  const borderColor = trend === 'up' ? 'emerald-500/30' : trend === 'down' ? 'rose-500/30' : 'primary/20'
+  const fromColor = trend === 'up' ? 'emerald-500/5' : trend === 'down' ? 'rose-500/5' : 'primary/5'
+  const hoverBorderColor = trend === 'up' ? 'emerald-500/50' : trend === 'down' ? 'rose-500/50' : 'primary/40'
+  
   return (
-    <Card className="p-5 border border-primary/20 shadow-md hover:shadow-lg transition-all duration-200 bg-gradient-to-br from-primary/5 via-background to-background hover:border-primary/40">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{title}</p>
-          <h3 className={`text-3xl font-bold mt-2 ${trendColor}`}>{value}</h3>
-          {hint && <p className="text-xs text-muted-foreground mt-2">{hint}</p>}
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-50px' }}
+      transition={{ duration: 0.3 }}
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+    >
+      <Card className={`p-3 sm:p-5 border border-${borderColor} shadow-md hover:shadow-2xl hover:border-${hoverBorderColor} transition-all duration-300 bg-gradient-to-br from-${fromColor} via-background to-background relative overflow-hidden`}>
+        {/* Gradient shimmer effect */}
+        <div className={`absolute inset-0 bg-gradient-to-r from-transparent via-${gradientColor}-500/5 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-500`} />
+        
+        <div className="relative flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">{title}</p>
+            <motion.h3
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              className={`text-xl sm:text-2xl md:text-3xl font-bold mt-2 ${trendColor} break-words`}
+            >
+              {value}
+            </motion.h3>
+            {hint && <p className="text-xs text-muted-foreground mt-1 sm:mt-2">{hint}</p>}
+          </div>
+          {Icon && (
+            <motion.div
+              initial={{ scale: 0, rotate: -20 }}
+              whileInView={{ scale: 1, rotate: 0 }}
+              transition={{ duration: 0.4, type: 'spring', stiffness: 100 }}
+              className={`w-5 h-5 sm:w-6 sm:h-6 ${trendColor} flex-shrink-0 mt-1`}
+            >
+              <Icon className="w-full h-full" />
+            </motion.div>
+          )}
         </div>
-        {Icon && <Icon className={`w-6 h-6 ${trendColor}`} />}
-      </div>
-    </Card>
+      </Card>
+    </motion.div>
   )
 }
 
@@ -35,84 +70,9 @@ const SectionHeader = ({ icon, title, subtitle }: { icon: string; title: string;
   </motion.div>
 )
 
-// AI Insights Generator
-const generateAIInsights = (metrics: any, entries: any[], sessionData: any[], setupData: any[]) => {
-  const recentEntries = entries.slice(-20) // Last 20 trades
-  
-  // 1. TRADING SUMMARY INSIGHT
-  const winRate = metrics.winRate || 0
-  const hasImprovement = metrics.maxWinStreak >= 3
-  const bestSession = metrics.bestSession?.name || 'N/A'
-  const bestSetup = metrics.bestSetup?.name || 'N/A'
-  const earlyExits = entries.filter((e: any) => {
-    const entry = Number(e.entry_price)
-    const target = Number(e.target_price)
-    const exit = Number(e.exit_price)
-    return entry && target && exit && Math.abs(exit - entry) < Math.abs(target - entry) * 0.5
-  }).length
-  
-  let summaryInsight = ''
-  if (winRate > 60 && hasImprovement) {
-    summaryInsight = `✨ Strong performance this period! You're maintaining a ${winRate.toFixed(1)}% win rate with consistent ${metrics.maxWinStreak} trade winning streaks. Your best setup is **${bestSetup}** and you're most profitable during **${bestSession}** sessions. Focus on replicating these conditions.`
-  } else if (winRate > 50) {
-    summaryInsight = `📊 You're above 50% win rate at ${winRate.toFixed(1)}%. Your setup **${bestSetup}** is performing well. However, ${earlyExits} of your recent trades show early exits - consider holding through structure levels to capture full RR.`
-  } else if (earlyExits > 5) {
-    summaryInsight = `⚠️ Win rate is ${winRate.toFixed(1)}%. The main issue: You're exiting ${earlyExits} trades early before targets. This is likely costing you significant points. Practice patience and let trades reach your planned targets even if price is moving slowly.`
-  } else {
-    summaryInsight = `📈 You have ${metrics.totalTrades} recorded trades. To improve: Focus on **${bestSetup}** which shows the highest win rate, and trade during **${bestSession}** sessions when you're most profitable. Build consistency through repetition.`
-  }
-  
-  // 2. MISTAKE COST EXPLANATION
-  const topMistake = entries
-    .filter((e: any) => Number(e.realized_points || e.realized_amount || 0) < 0)
-    .sort((a: any, b: any) => Number(a.realized_points || a.realized_amount) - Number(b.realized_points || b.realized_amount))[0]
-  
-  let mistakeExplanation = ''
-  let mistakeFix = ''
-  if (topMistake) {
-    const loss = Math.abs(Number(topMistake.realized_points || topMistake.realized_amount || 0))
-    const lossReason = topMistake.loss_reason || 'unspecified'
-    
-    if (lossReason.toLowerCase().includes('early') || earlyExits > 5) {
-      mistakeExplanation = `Your biggest loss cost **${loss.toFixed(2)} pts** and was related to exiting early. This is a pattern: ${earlyExits} of your recent trades closed before targets. You're leaving money on the table by not following your plan.`
-      mistakeFix = `Commit to holding every trade until it reaches either your target price or stop loss. Use alerts instead of watching price, so you don't panic exit.`
-    } else if (lossReason.toLowerCase().includes('entry') || lossReason.toLowerCase().includes('re-entry')) {
-      mistakeExplanation = `Your biggest loss cost **${loss.toFixed(2)} pts** from a poor entry or re-entry. You're likely entering on weak setups or chasing prices after losses.`
-      mistakeFix = `Add a rule: No re-entries within 30 minutes of a stop loss. Wait for a fresh setup confirmation before entering again.`
-    } else {
-      mistakeExplanation = `Your biggest loss cost **${loss.toFixed(2)} pts**. At your current win rate of ${winRate.toFixed(1)}%, each loss has outsized impact. Reduce position size or tighten stops to protect capital.`
-      mistakeFix = `Focus on trades with 1:2+ RR only. Skip trades that don't meet your minimum R:R requirement, even if they look good.`
-    }
-  } else {
-    mistakeExplanation = `Great job! You don't have any losing trades yet, or all your trades are still breakeven. Continue executing your trading plan and maintaining discipline.`
-    mistakeFix = `Keep focusing on your entry rules and risk management. Every trade is a learning opportunity.`
-  }
-  
-  // 3. NEXT WEEK ACTION PLAN
-  const maxLoss = metrics.maxDD || 50
-  const safeMaxTrades = Math.max(2, Math.floor(maxLoss / 15)) // Allow max 2 trades per day based on drawdown
-  const safeMaxStopSize = Math.round(maxLoss / 2)
-  
-  const actionPlan = {
-    rules: [
-      `Trade only when market structure confirms your setup (no FOMO entries)`,
-      `Stop after ${Math.max(1, Math.floor(metrics.maxLossStreak / 2))} consecutive losses`,
-      `No re-entry into the same symbol within 1 hour of stop loss`,
-      `Hold winners until minimum 2R structure or daily close`
-    ],
-    checklist: [
-      { label: 'Max trades/day', value: safeMaxTrades },
-      { label: 'Max SL size', value: `${safeMaxStopSize} pts` },
-      { label: 'Min RR required', value: '1:1.5+' },
-      { label: 'No trading after', value: '1:00 PM' }
-    ]
-  }
-  
-  return { summaryInsight, mistakeExplanation, mistakeFix, actionPlan }
-}
-
 const Performance = () => {
   const { user } = useAuth()
+  const { adminSettings } = useAdmin()
   const [loading, setLoading] = useState(false)
   const [metrics, setMetrics] = useState<any>({})
   const [equityData, setEquityData] = useState<any[]>([])
@@ -121,6 +81,11 @@ const Performance = () => {
   const [setupData, setSetupData] = useState<any[]>([])
   const [sessionData, setSessionData] = useState<any[]>([])
   const [entries, setEntries] = useState<any[]>([])
+  const [selectedSession, setSelectedSession] = useState<any | null>(null)
+  const [sessionModalOpen, setSessionModalOpen] = useState(false)
+  const [symbolStrategyMatrix, setSymbolStrategyMatrix] = useState<any[]>([])
+  const [selectedSymbolData, setSelectedSymbolData] = useState<any | null>(null)
+  const [symbolModalOpen, setSymbolModalOpen] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -233,6 +198,37 @@ const Performance = () => {
         const setupStats = Object.entries(bySetup).map(([name, obj]) => ({ name, winrate: obj.total ? (obj.wins/obj.total)*100 : 0, trades: obj.total })).sort((a,b) => b.winrate - a.winrate)
         if (mounted) setSetupData(setupStats.slice(0, 8))
 
+        // 7B. SYMBOL & STRATEGY PERFORMANCE MATRIX
+        const bySymbolSetup: Record<string, Record<string, { wins:number, total:number, pnl:number, totalRR:number }>> = {}
+        for (const row of r) {
+          const symbol = (row.symbol || row.instrument || '—').toString().toUpperCase()
+          const setup = (row.setup || '—').toString()
+          const pnl = Number(row.realized_points || row.realized_amount || 0)
+          const achievedRR = row.achieved_rr ? Number(row.achieved_rr) : 0
+          
+          if (!bySymbolSetup[symbol]) bySymbolSetup[symbol] = {}
+          if (!bySymbolSetup[symbol][setup]) bySymbolSetup[symbol][setup] = { wins: 0, total: 0, pnl: 0, totalRR: 0 }
+          
+          if (pnl > 0) bySymbolSetup[symbol][setup].wins += 1
+          bySymbolSetup[symbol][setup].total += 1
+          bySymbolSetup[symbol][setup].pnl += pnl
+          bySymbolSetup[symbol][setup].totalRR += achievedRR
+        }
+        
+        // Transform to array format for table
+        const matrixData = Object.entries(bySymbolSetup).map(([symbol, setupMap]) => {
+          const strategies = Object.entries(setupMap).map(([setup, stats]) => ({
+            setup,
+            trades: stats.total,
+            wins: stats.wins,
+            winrate: stats.total ? (stats.wins / stats.total) * 100 : 0,
+            pnl: Math.round(stats.pnl * 100) / 100,
+            avgRR: stats.total ? Math.round((stats.totalRR / stats.total) * 100) / 100 : 0
+          }))
+          return { symbol, strategies }
+        })
+        if (mounted) setSymbolStrategyMatrix(matrixData)
+
         // 8. SESSION ANALYSIS
         const bySession: Record<string, { wins:number, total:number, pnl:number }> = {}
         for (const row of r) {
@@ -272,7 +268,7 @@ const Performance = () => {
         // 11. CONSISTENCY SCORE
         const emotionalTrades = r.filter((t:any) => t.emotional_trade === true).length
         const emotionalTradesPercent = totalTrades ? (emotionalTrades / totalTrades) * 100 : 0
-        const consistencyScore = ((winRate/100) * avgAchievedRR / Math.max(0.1, emotionalTradesPercent/100)) * 10
+        const consistencyScore = totalTrades > 0 ? ((winRate/100) * avgAchievedRR / Math.max(0.1, emotionalTradesPercent/100)) * 10 : 0
         const finalScore = Math.min(100, Math.max(0, consistencyScore))
 
         if (!mounted) return
@@ -307,129 +303,281 @@ const Performance = () => {
   }, [user])
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* HEADER */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-cyan-400 to-emerald-400 bg-clip-text text-transparent">Performance Analytics</h1>
-          <p className="text-muted-foreground mt-2">Professional trading performance breakdown with advanced metrics</p>
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-start justify-between gap-4 sm:gap-0">
+        <div className="w-full">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-cyan-400 to-emerald-400 bg-clip-text text-transparent">Performance Analytics</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-2">Professional trading performance breakdown with advanced metrics</p>
         </div>
       </motion.div>
 
-      {/* 🔷 PERFORMANCE OVERVIEW - KEY METRICS */}
+      {/* PERFORMANCE OVERVIEW - KEY METRICS */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <SectionHeader icon="🔷" title="Performance Overview" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard title="Expectancy per Trade" value={`${metrics.expectancy ?? 0}${typeof metrics.expectancy === 'number' ? ' pts' : ''}`} hint={`Expected ${metrics.projectedGain?.toFixed(0)} pts per 100 trades`} icon={Target} trend={metrics.expectancy > 0 ? 'up' : 'down'} />
-          <MetricCard title="Win Rate" value={`${metrics.winRate ?? 0}%`} hint={`${metrics.wins} wins / ${metrics.losses} losses`} icon={TrendingUp} trend={metrics.winRate > 50 ? 'up' : 'down'} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <MetricCard title="Expectancy per Trade" value={`${metrics.expectancy ?? 0}${typeof metrics.expectancy === 'number' ? ' pts' : ''}`} hint={`Expected ${(metrics.projectedGain ?? 0).toFixed(0)} pts per 100 trades`} icon={Target} trend={(metrics.expectancy ?? 0) > 0 ? 'up' : 'down'} />
+          <MetricCard title="Win Rate" value={`${metrics.winRate ?? 0}%`} hint={`${metrics.wins ?? 0} wins / ${metrics.losses ?? 0} losses`} icon={TrendingUp} trend={(metrics.winRate ?? 0) > 50 ? 'up' : 'down'} />
           <MetricCard title="Max Win Streak" value={metrics.maxWinStreak ?? 0} hint="Consecutive winning trades" icon={Zap} trend="up" />
           <MetricCard title="Max Loss Streak" value={metrics.maxLossStreak ?? 0} hint="Longest losing sequence" icon={TrendingDown} trend="down" />
           <MetricCard title="Max Drawdown" value={`${metrics.maxDD ?? 0} pts`} hint={`Average: ${metrics.avgDD ?? 0} pts`} icon={AlertCircle} trend="down" />
-          <MetricCard title="Consistency Score" value={`${metrics.consistencyScore ?? 0}/100`} hint="Overall trading discipline" icon={Target} trend={metrics.consistencyScore > 70 ? 'up' : 'neutral'} />
-          <MetricCard title="RR Achieved" value={`1:${(metrics.avgAchievedRR ?? 0).toFixed(2)}`} hint={`Target: 1:${(metrics.avgTargetRR ?? 0).toFixed(2)}`} trend={metrics.avgAchievedRR >= metrics.avgTargetRR ? 'up' : 'down'} />
-          <MetricCard title="Total P&L" value={`${metrics.totalPnL >= 0 ? '+' : ''}${metrics.totalPnL ?? 0} pts`} hint={`${metrics.totalTrades ?? 0} trades`} icon={TrendingUp} trend={metrics.totalPnL > 0 ? 'up' : 'down'} />
+          <MetricCard title="Consistency Score" value={`${metrics.consistencyScore ?? 0}/100`} hint="Overall trading discipline" icon={Target} trend={(metrics.consistencyScore ?? 0) > 70 ? 'up' : 'neutral'} />
+          <MetricCard title="RR Achieved" value={`1:${Math.round(metrics.avgAchievedRR ?? 0)}`} hint={`Target: 1:${Math.round(metrics.avgTargetRR ?? 0)}`} trend={(metrics.avgAchievedRR ?? 0) >= (metrics.avgTargetRR ?? 0) ? 'up' : 'down'} />
+          <MetricCard title="Total P&L" value={`${(metrics.totalPnL ?? 0) >= 0 ? '+' : ''}${metrics.totalPnL ?? 0} pts`} hint={`${metrics.totalTrades ?? 0} trades`} icon={TrendingUp} trend={(metrics.totalPnL ?? 0) > 0 ? 'up' : (metrics.totalPnL ?? 0) < 0 ? 'down' : 'neutral'} />
         </div>
       </motion.div>
 
-      {/* 📈 EQUITY CURVE */}
+      {/* EQUITY CURVE */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-        <SectionHeader icon="📈" title="Equity Curve Simulator" />
-        <Card className="p-6 border border-cyan-500/20 shadow-lg bg-gradient-to-br from-cyan-500/5 via-background to-background">
-          <div style={{ height: 300 }}>
+        <SectionHeader icon="" title="Equity Curve Simulator" />
+        <Card className="p-3 sm:p-6 border border-cyan-500/30 shadow-lg hover:shadow-2xl hover:border-cyan-500/50 transition-all duration-300 bg-gradient-to-br from-cyan-500/5 via-slate-900/20 to-background relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-full blur-3xl -z-10" />
+          
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
+            <div>
+              <p className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider">Account Growth</p>
+              <p className="text-xs text-muted-foreground mt-1">Cumulative P&L progression over time</p>
+            </div>
+            {equityData.length > 0 && (
+              <Badge className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 border border-cyan-500/30">
+                {equityData.length} snapshots
+              </Badge>
+            )}
+          </div>
+
+          <div style={{ height: 280, minHeight: 280 }} className="w-full">
             {equityData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={equityData}>
                   <defs>
                     <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.1}/>
+                      <stop offset="5%" stopColor="rgb(34, 197, 94)" stopOpacity={0.8}/>
+                      <stop offset="45%" stopColor="rgb(6, 182, 212)" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="rgb(6, 182, 212)" stopOpacity={0.05}/>
+                    </linearGradient>
+                    <linearGradient id="equityShadowGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="rgb(6, 182, 212)" stopOpacity={0.3}/>
+                      <stop offset="100%" stopColor="rgb(6, 182, 212)" stopOpacity={0.0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.2} />
-                  <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "2px solid hsl(var(--primary))" }} />
-                  <Line type="monotone" dataKey="equity" stroke="hsl(var(--primary))" strokeWidth={3} dot={false} isAnimationActive />
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    stroke="hsl(var(--border))" 
+                    opacity={0.15}
+                    vertical={false}
+                  />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))" 
+                    style={{ fontSize: '12px' }}
+                    opacity={0.6}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))" 
+                    style={{ fontSize: '12px' }}
+                    opacity={0.6}
+                    domain={['auto', 'auto']}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "2px solid rgb(6, 182, 212)",
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 30px rgba(6, 182, 212, 0.2)'
+                    }}
+                    formatter={(value: any) => [`${value.toFixed(2)} pts`, 'Cumulative P&L']}
+                    labelFormatter={(label) => `${label}`}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="equity" 
+                    stroke="rgb(34, 197, 94)" 
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: 'rgb(6, 182, 212)' }}
+                    activeDot={{ r: 6, fill: 'rgb(34, 197, 94)' }}
+                    isAnimationActive={true}
+                    animationDuration={1000}
+                    fillOpacity={0.3}
+                    fill="url(#equityShadowGradient)"
+                  />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">No trading data available</div>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2"
+              >
+                <AlertTriangle className="w-8 h-8 opacity-50" />
+                <div className="text-center">
+                  <p className="font-semibold">No trading data yet</p>
+                  <p className="text-xs mt-1">Execute trades to see your equity curve</p>
+                </div>
+              </motion.div>
             )}
           </div>
+
+          {equityData.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-cyan-500/20 grid grid-cols-3 gap-3 text-xs">
+              <div className="p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                <p className="text-muted-foreground mb-0.5">Starting Equity</p>
+                <p className="font-bold text-cyan-400">${(equityData[0]?.equity ?? 0).toFixed(2)}</p>
+              </div>
+              <div className="p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                <p className="text-muted-foreground mb-0.5">Current Equity</p>
+                <p className={`font-bold ${(equityData[equityData.length - 1]?.equity ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  ${(equityData[equityData.length - 1]?.equity ?? 0).toFixed(2)}
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                <p className="text-muted-foreground mb-0.5">Total Return</p>
+                <p className={`font-bold ${((equityData[equityData.length - 1]?.equity ?? 0) - (equityData[0]?.equity ?? 0)) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {(((equityData[equityData.length - 1]?.equity ?? 0) - (equityData[0]?.equity ?? 0)) >= 0 ? '+' : '')}${((equityData[equityData.length - 1]?.equity ?? 0) - (equityData[0]?.equity ?? 0)).toFixed(2)}
+                </p>
+              </div>
+            </div>
+          )}
         </Card>
       </motion.div>
 
-      {/* ⚖️ RISK-TO-REWARD EXECUTION - Locked Section Start */}
-      {(() => {
-        const { adminSettings } = useAdmin();
-        
-        if (adminSettings.performance_analytics_locked) {
-          return (
-            <UnderDevelopment 
-              title="Performance Analytics" 
-              description="Detailed analytics about your trading performance are locked."
-              type={adminSettings.performance_lock_type} 
-            />
-          );
-        }
-        
-        return (
-          <>
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <SectionHeader icon="⚖️" title="Risk-to-Reward Execution" />
+      {/* RISK-TO-REWARD EXECUTION - Locked Section Start */}
+      {adminSettings?.performance_analytics_locked ? (
+        <UnderDevelopment 
+          title="Performance Analytics" 
+          description="Detailed analytics about your trading performance are locked."
+          type={adminSettings?.performance_lock_type} 
+        />
+      ) : (
+        <>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <SectionHeader icon="" title="Risk-to-Reward Execution" />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-6 border border-emerald-500/20 shadow-md bg-gradient-to-br from-emerald-500/5 via-background to-background">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center pb-3 border-b border-emerald-500/20">
-                <span className="text-sm font-semibold">Target RR (Planned)</span>
-                <span className="text-2xl font-bold text-emerald-400">1:{metrics.avgTargetRR?.toFixed(2)}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Based on: (Target Price - Entry Price) ÷ (Entry Price - Stop Loss Price)</p>
-              <div className="flex justify-between items-center pb-3 border-b border-emerald-500/20">
-                <span className="text-sm font-semibold">Achieved RR (Actual)</span>
-                <span className="text-2xl font-bold text-cyan-400">1:{metrics.avgAchievedRR?.toFixed(2)}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Based on: (Exit Price - Entry Price) ÷ (Entry Price - Stop Loss Price)</p>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold">Efficiency</span>
-                <span className={`text-xl font-bold ${metrics.avgAchievedRR >= metrics.avgTargetRR ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {metrics.avgAchievedRR && metrics.avgTargetRR ? ((metrics.avgAchievedRR / metrics.avgTargetRR) * 100).toFixed(0) : 0}%
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground pt-2">
-                {metrics.avgAchievedRR < metrics.avgTargetRR ? '⚠️ You\'re exiting early and missing targets' : '✅ You\'re capturing your full RR'}
-              </p>
-            </div>
-          </Card>
+                <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
+                  <Card className="p-5 sm:p-6 border border-emerald-500/30 shadow-lg hover:shadow-2xl hover:border-emerald-500/50 transition-all duration-300 bg-gradient-to-br from-emerald-500/5 via-slate-900/20 to-background relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full blur-3xl -z-10" />
+                    
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center pb-3 border-b border-emerald-500/20">
+                        <span className="text-xs sm:text-sm font-semibold text-muted-foreground">Target RR (Planned)</span>
+                        <motion.span 
+                          initial={{ scale: 0.8 }}
+                          whileInView={{ scale: 1 }}
+                          className="text-xl sm:text-2xl font-bold text-emerald-400"
+                        >
+                          1:{(metrics.avgTargetRR ?? 0) % 1 === 0 ? (metrics.avgTargetRR ?? 0) : (metrics.avgTargetRR ?? 0).toFixed(2)}
+                        </motion.span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">(Target Price - Entry) ÷ (Entry - Stop Loss)</p>
+                      
+                      <div className="flex justify-between items-center pb-3 border-b border-emerald-500/20">
+                        <span className="text-xs sm:text-sm font-semibold text-muted-foreground">Achieved RR (Actual)</span>
+                        <motion.span 
+                          initial={{ scale: 0.8 }}
+                          whileInView={{ scale: 1 }}
+                          className="text-xl sm:text-2xl font-bold text-cyan-400"
+                        >
+                          1:{(metrics.avgAchievedRR ?? 0) % 1 === 0 ? (metrics.avgAchievedRR ?? 0) : (metrics.avgAchievedRR ?? 0).toFixed(2)}
+                        </motion.span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">(Exit Price - Entry) ÷ (Entry - Stop Loss)</p>
+                      
+                      <div className="flex justify-between items-center p-3 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 rounded-lg border border-emerald-500/20">
+                        <span className="text-xs sm:text-sm font-semibold">Efficiency Score</span>
+                        <span className={`text-lg sm:text-xl font-bold ${(metrics.avgAchievedRR ?? 0) >= (metrics.avgTargetRR ?? 0) ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {(metrics.avgAchievedRR && metrics.avgTargetRR) ? (((metrics.avgAchievedRR ?? 0) / (metrics.avgTargetRR ?? 1)) * 100).toFixed(0) : 0}%
+                        </span>
+                      </div>
+                      
+                      {metrics.avgAchievedRR !== undefined && metrics.avgTargetRR !== undefined && (metrics.avgAchievedRR ?? 0) > 0 && (
+                        <motion.p 
+                          initial={{ opacity: 0 }}
+                          whileInView={{ opacity: 1 }}
+                          transition={{ delay: 0.2 }}
+                          className={`text-xs pt-2 px-3 py-2 rounded-lg font-medium ${(metrics.avgAchievedRR ?? 0) >= (metrics.avgTargetRR ?? 0) ? 'bg-emerald-500/10 text-emerald-300' : 'bg-rose-500/10 text-rose-300'}`}
+                        >
+                          {(metrics.avgAchievedRR ?? 0) < (metrics.avgTargetRR ?? 0) ? 'Exiting early - You\'re leaving money on the table' : 'Perfect execution - Capturing your full R:R'}
+                        </motion.p>
+                      )}
+                    </div>
+                  </Card>
+                </motion.div>
 
-          <Card className="p-6 border border-blue-500/20 shadow-md bg-gradient-to-br from-blue-500/5 via-background to-background">
-            <div style={{ height: 250 }}>
-              {rrData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={rrData.slice(-15)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.2} />
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '10px' }} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-                    <Legend />
-                    <Bar dataKey="target" fill="hsl(var(--primary))" opacity={0.5} />
-                    <Bar dataKey="achieved" fill="hsl(120, 100%, 50%)" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">No RR data</div>
-              )}
-            </div>
-          </Card>
-        </div>
-      </motion.div>
+                <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
+                  <Card className="p-5 sm:p-6 border border-blue-500/30 shadow-lg hover:shadow-2xl hover:border-blue-500/50 transition-all duration-300 bg-gradient-to-br from-blue-500/5 via-slate-900/20 to-background relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-3xl -z-10" />
+                    
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider">RR Comparison</p>
+                        <p className="text-xs text-muted-foreground mt-1">Target vs Achieved on last 15 trades</p>
+                      </div>
+                    </div>
+                    
+                    <div style={{ height: 250 }}>
+                      {rrData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={rrData.slice(-15)}>
+                            <defs>
+                              <linearGradient id="rrTargetGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity={0.6}/>
+                                <stop offset="100%" stopColor="rgb(34, 197, 94)" stopOpacity={0.2}/>
+                              </linearGradient>
+                              <linearGradient id="rrAchievedGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="rgb(6, 182, 212)" stopOpacity={0.8}/>
+                                <stop offset="100%" stopColor="rgb(6, 182, 212)" stopOpacity={0.2}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.15} vertical={false} />
+                            <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '10px' }} opacity={0.6} />
+                            <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '11px' }} opacity={0.6} domain={[0, 'auto']} />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: "hsl(var(--card))", 
+                                border: "2px solid rgb(6, 182, 212)",
+                                borderRadius: '8px'
+                              }}
+                              formatter={(value: any) => value.toFixed(2)}
+                              labelFormatter={(label) => `Trade ${label}`}
+                            />
+                            <Bar dataKey="target" fill="url(#rrTargetGradient)" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="achieved" fill="url(#rrAchievedGradient)" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2"
+                        >
+                          <AlertTriangle className="w-8 h-8 opacity-50" />
+                          <p className="text-xs">No RR data available yet</p>
+                        </motion.div>
+                      )}
+                    </div>
+                  </Card>
+                </motion.div>
+              </div>
+            </motion.div>
 
-      {/* 📊 STRATEGY BREAKDOWN */}
+      {/* STRATEGY BREAKDOWN */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-        <SectionHeader icon="📊" title="Strategy Breakdown" />
-        <Card className="p-6 border border-violet-500/20 shadow-md bg-gradient-to-br from-violet-500/5 via-background to-background">
+        <SectionHeader icon="" title="Strategy Breakdown" />
+        <Card className="p-5 sm:p-6 border border-violet-500/30 shadow-lg hover:shadow-2xl hover:border-violet-500/50 transition-all duration-300 bg-gradient-to-br from-violet-500/5 via-slate-900/20 to-background relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-violet-500/10 to-transparent rounded-full blur-3xl -z-10" />
+          
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider">Performance by Setup</p>
+              <p className="text-xs text-muted-foreground mt-1">Win rate and trade count for each strategy</p>
+            </div>
+            {setupData.length > 0 && (
+              <Badge className="bg-gradient-to-r from-violet-500/20 to-purple-500/20 text-violet-400 border border-violet-500/30">
+                {setupData.length} strategies
+              </Badge>
+            )}
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs sm:text-sm">
               <thead>
                 <tr className="text-muted-foreground border-b border-violet-500/20">
                   <th className="text-left py-3 px-3 font-semibold">Setup Name</th>
@@ -440,14 +588,28 @@ const Performance = () => {
               </thead>
               <tbody>
                 {setupData.length > 0 ? setupData.map((setup, i) => (
-                  <tr key={i} className="border-b border-violet-500/10 hover:bg-violet-500/5 transition-colors">
+                  <motion.tr 
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="border-b border-violet-500/10 hover:bg-violet-500/10 transition-colors"
+                  >
                     <td className="py-3 px-3 font-medium">{setup.name}</td>
-                    <td className="text-right py-3 px-3">{setup.trades}</td>
-                    <td className="text-right py-3 px-3"><Badge className={setup.winrate > 55 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}>{setup.winrate.toFixed(1)}%</Badge></td>
-                    <td className="text-right py-3 px-3">{setup.winrate > 55 ? '✅ Profitable' : '⚠️ Review'}</td>
-                  </tr>
+                    <td className="text-right py-3 px-3 font-semibold">{setup.trades}</td>
+                    <td className="text-right py-3 px-3">
+                      <Badge className={`${setup.winrate > 55 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'} border-0`}>
+                        {setup.winrate.toFixed(1)}%
+                      </Badge>
+                    </td>
+                    <td className="text-right py-3 px-3">
+                      <span className={setup.winrate > 55 ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
+                        {setup.winrate > 55 ? '✓' : '✗'}
+                      </span>
+                    </td>
+                  </motion.tr>
                 )) : (
-                  <tr><td colSpan={4} className="py-4 text-center text-muted-foreground">No setup data</td></tr>
+                  <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">No setup data recorded yet</td></tr>
                 )}
               </tbody>
             </table>
@@ -455,177 +617,302 @@ const Performance = () => {
         </Card>
       </motion.div>
 
-      {/* 🕐 SESSION EFFICIENCY */}
+      {/* SESSION PERFORMANCE */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-        <SectionHeader icon="🕐" title="Session Efficiency" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {sessionData.length > 0 && (
-            <>
-              <Card className="p-6 border border-amber-500/20 shadow-md bg-gradient-to-br from-amber-500/5 via-background to-background">
-                <div className="space-y-3">
-                  {sessionData.slice(0, 4).map((session, i) => (
-                    <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+        <SectionHeader icon="" title="Session Performance Analysis" />
+        <Card className="p-5 sm:p-6 border border-amber-500/30 shadow-lg hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 bg-gradient-to-br from-amber-500/5 via-slate-900/20 to-background relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-amber-500/10 to-transparent rounded-full blur-3xl -z-10" />
+          
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider">Performance by Session</p>
+              <p className="text-xs text-muted-foreground mt-1">Win rate and P&L breakdown for each trading session</p>
+            </div>
+            {sessionData.length > 0 && (
+              <Badge className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 border border-amber-500/30">
+                {sessionData.length} sessions
+              </Badge>
+            )}
+          </div>
+
+          {sessionData.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sessionData.map((session, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 8 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                >
+                  <Card
+                    onClick={() => { setSelectedSession(session); setSessionModalOpen(true) }}
+                    className="p-4 cursor-pointer hover:shadow-2xl transition-shadow border border-amber-500/10 bg-amber-500/5"
+                  >
+                    <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-semibold text-sm">{session.name}</p>
-                        <p className="text-xs text-muted-foreground">{session.trades} trades</p>
+                        <p className="text-sm font-medium">{session.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{session.trades} trades</p>
                       </div>
                       <div className="text-right">
-                        <p className={`font-bold ${session.winrate > 55 ? 'text-emerald-400' : 'text-rose-400'}`}>{session.winrate.toFixed(1)}%</p>
-                        <p className="text-xs text-muted-foreground">{session.pnl >= 0 ? '+' : ''}{session.pnl} pts</p>
+                        <Badge className={`${session.winrate > 55 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'} border-0`}>{session.winrate.toFixed(1)}%</Badge>
+                        <p className={`mt-2 font-semibold ${session.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{session.pnl >= 0 ? '+' : ''}{session.pnl} pts</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </Card>
-              <Card className="p-6 border border-teal-500/20 shadow-md bg-gradient-to-br from-teal-500/5 via-background to-background">
-                <p className="text-sm font-semibold text-muted-foreground mb-3">Best Session</p>
-                {metrics.bestSession && (
-                  <div className="space-y-2">
-                    <p className="text-2xl font-bold text-emerald-400">{metrics.bestSession.name}</p>
-                    <p className="text-sm">Win Rate: <span className="font-semibold text-cyan-400">{metrics.bestSession.winrate.toFixed(1)}%</span></p>
-                    <p className="text-sm">Trades: <span className="font-semibold">{metrics.bestSession.trades}</span></p>
-                    <p className="text-sm">Total P&L: <span className={`font-semibold ${metrics.bestSession.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{metrics.bestSession.pnl >= 0 ? '+' : ''}{metrics.bestSession.pnl} pts</span></p>
+                  </Card>
+                </motion.div>
+              ))}
+
+              {/* Session detail modal */}
+              <Dialog open={sessionModalOpen} onOpenChange={(val) => { setSessionModalOpen(val); if (!val) setSelectedSession(null) }}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{selectedSession?.name || 'Session'}</DialogTitle>
+                    <DialogDescription>
+                      {selectedSession ? `${selectedSession.trades} trades • Win ${selectedSession.winrate?.toFixed(1)}% • ${selectedSession.pnl >= 0 ? '+' : ''}${selectedSession.pnl} pts` : ''}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="mt-4 max-h-64 overflow-y-auto">
+                    {entries && entries.length > 0 ? (
+                      <table className="w-full text-xs sm:text-sm">
+                        <thead>
+                          <tr className="text-muted-foreground border-b">
+                            <th className="text-left py-2 px-2">Time</th>
+                            <th className="text-left py-2 px-2">Symbol</th>
+                            <th className="text-right py-2 px-2">P&L</th>
+                            <th className="text-right py-2 px-2">RR</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {entries.filter((e:any) => ((e.session || '—').toString() === (selectedSession?.name || '—'))).map((e:any, idx:number) => (
+                            <tr key={idx} className="border-b">
+                              <td className="py-2 px-2">{e.entry_at ? new Date(e.entry_at).toLocaleDateString() : new Date(e.created_at).toLocaleDateString()}</td>
+                              <td className="py-2 px-2">{e.symbol || e.instrument || '—'}</td>
+                              <td className={`py-2 px-2 text-right font-semibold ${Number(e.realized_points || e.realized_amount || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{Number(e.realized_points || e.realized_amount || 0) >= 0 ? '+' : ''}{Number(e.realized_points || e.realized_amount || 0)}</td>
+                              <td className="py-2 px-2 text-right">{e.achieved_rr ? `1:${Number(e.achieved_rr).toFixed(2)}` : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No trades recorded for this session.</p>
+                    )}
                   </div>
-                )}
-              </Card>
-            </>
+
+                  <DialogFooter>
+                    <button onClick={() => { setSessionModalOpen(false); setSelectedSession(null) }} className="px-3 py-1 rounded bg-primary/10 hover:bg-primary/20 text-sm">Close</button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          ) : (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center py-8 text-muted-foreground"
+            >
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="font-semibold">No session data recorded yet</p>
+            </motion.div>
           )}
-        </div>
+        </Card>
       </motion.div>
 
-      {/* 🚫 MISTAKE COST ANALYSIS */}
+      {/*  SYMBOL & STRATEGY PERFORMANCE MATRIX - SCROLLABLE CARDS */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-        <SectionHeader icon="🚫" title="Mistake Cost Analysis" />
-        <Card className="p-6 border border-rose-500/20 shadow-md bg-gradient-to-br from-rose-500/5 via-background to-background">
+        <SectionHeader icon="" title="Symbol & Strategy Performance Matrix" subtitle="See what works for which instrument and setup" />
+        <Card className="p-3 sm:p-6 border border-indigo-500/30 shadow-lg hover:shadow-2xl hover:border-indigo-500/50 transition-all duration-300 bg-gradient-to-br from-indigo-500/5 via-slate-900/20 to-background relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full blur-3xl -z-10" />
+          
+          {symbolStrategyMatrix.length > 0 ? (
+            <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">
+              {symbolStrategyMatrix.map((row, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, y: 8 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.05 }}
+                  onClick={() => { setSelectedSymbolData(row); setSymbolModalOpen(true); }}
+                  className="flex-shrink-0 w-80 snap-start p-4 rounded-lg border border-indigo-500/30 bg-gradient-to-br from-indigo-500/5 to-background hover:border-indigo-500/60 hover:shadow-lg transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-lg font-bold text-indigo-400">{row.symbol}</span>
+                    <Badge className="bg-indigo-500/30 text-indigo-300 border-indigo-500/20">
+                      {row.strategies.length} setup{row.strategies.length > 1 ? 's' : ''}
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {row.strategies.slice(0, 3).map((strat: any, sidx: number) => (
+                      <div key={sidx} className="text-xs space-y-1 pb-2 border-b border-indigo-500/10 last:border-b-0 last:pb-0">
+                        <p className="font-semibold text-foreground">{strat.setup}</p>
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Win: {strat.winrate.toFixed(1)}%</span>
+                          <span className={strat.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                            {strat.pnl >= 0 ? '+' : ''}{strat.pnl} pts
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {row.strategies.length > 3 && (
+                      <p className="text-xs text-muted-foreground italic pt-2">+{row.strategies.length - 3} more setup{row.strategies.length - 3 > 1 ? 's' : ''}</p>
+                    )}
+                  </div>
+                  
+                  <button className="mt-3 w-full text-xs py-2 rounded bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/40 transition-colors group-hover:text-indigo-200">
+                    View Details →
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center py-12 text-muted-foreground"
+            >
+              <AlertTriangle className="w-8 h-8 mx-auto mb-3 opacity-50" />
+              <p className="font-semibold">No symbol/strategy data yet</p>
+              <p className="text-xs mt-2">Log trades with symbols and setups to see performance by instrument</p>
+            </motion.div>
+          )}
+        </Card>
+      </motion.div>
+
+      {/*  MISTAKE COST ANALYSIS */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+        <SectionHeader icon="" title="Mistake Cost Analysis" />
+        <Card className="p-5 sm:p-6 border border-rose-500/30 shadow-lg hover:shadow-2xl hover:border-rose-500/50 transition-all duration-300 bg-gradient-to-br from-rose-500/5 via-slate-900/20 to-background relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-rose-500/10 to-transparent rounded-full blur-3xl -z-10" />
+          
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider">Top Losses</p>
+              <p className="text-xs text-muted-foreground mt-1">Your 5 largest losing trades</p>
+            </div>
+            {mistakeData.length > 0 && (
+              <Badge className="bg-gradient-to-r from-rose-500/20 to-red-500/20 text-rose-400 border border-rose-500/30">
+                {mistakeData.length} losses
+              </Badge>
+            )}
+          </div>
+
           <div className="space-y-3">
             {mistakeData.length > 0 ? mistakeData.map((mistake, i) => (
-              <div key={i} className="flex justify-between items-center p-4 rounded-lg bg-rose-500/5 border border-rose-500/10 hover:border-rose-500/30 transition-colors">
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, x: -15 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="flex justify-between items-center p-4 rounded-lg bg-gradient-to-r from-rose-500/5 to-red-500/5 border border-rose-500/20 hover:border-rose-500/40 hover:shadow-lg transition-all"
+              >
                 <div>
-                  <p className="font-semibold text-sm">Loss #{i+1}</p>
-                  <p className="text-xs text-muted-foreground">{mistake.reason || 'Unspecified'}</p>
+                  <p className="font-semibold text-sm text-foreground">Loss #{i + 1}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{mistake.reason || 'Unspecified'}</p>
                 </div>
-                <p className="text-2xl font-bold text-rose-400">–{mistake.cost.toFixed(2)} pts</p>
-              </div>
+                <motion.p 
+                  initial={{ scale: 0.8 }}
+                  whileInView={{ scale: 1 }}
+                  className="text-xl sm:text-2xl font-bold text-red-400"
+                >
+                  –{mistake.cost.toFixed(2)} pts
+                </motion.p>
+              </motion.div>
             )) : (
-              <p className="text-center text-muted-foreground py-4">No losing trades</p>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-8 text-muted-foreground"
+              >
+                <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
+                <p className="font-semibold">No losing trades</p>
+                <p className="text-xs mt-1">Great job so far! Keep it up</p>
+              </motion.div>
             )}
           </div>
         </Card>
       </motion.div>
 
-      {/* 🔥 CONSISTENCY SCORE BADGE */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-        <Card className="p-8 border-2 border-primary/40 shadow-xl bg-gradient-to-br from-primary/10 via-background to-background text-center">
-          <p className="text-muted-foreground mb-2">Your Trading Discipline Score</p>
-          <div className="text-6xl font-bold text-transparent bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text mb-2">
-            {metrics.consistencyScore ?? 0}/100
-          </div>
-          <p className="text-sm text-muted-foreground max-w-lg mx-auto">
-            Based on win rate, RR execution, and emotional trading patterns. This score reflects your overall trading discipline and consistency.
-          </p>
-        </Card>
-      </motion.div>
-
-      {/* 🤖 AI COACHING INSIGHTS - FINAL SECTION */}
-      {(() => {
-        if (!metrics.totalTrades || metrics.totalTrades === 0) return null
-        const aiInsights = generateAIInsights(metrics, entries, sessionData, setupData)
-        return (
-          <div className="space-y-6 pt-8 border-t border-border/50">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-transparent bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text mb-2">
-                  🤖 AI Trading Coach
-                </h2>
-                <p className="text-muted-foreground">Personalized insights based on your trading data</p>
+      {/* SYMBOL STRATEGY DETAIL MODAL */}
+      <Dialog open={symbolModalOpen} onOpenChange={setSymbolModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="text-2xl font-bold text-indigo-400">{selectedSymbolData?.symbol}</span>
+              <Badge className="bg-indigo-500/30 text-indigo-300">
+                {selectedSymbolData?.strategies.length} Setup{selectedSymbolData?.strategies.length > 1 ? 's' : ''}
+              </Badge>
+            </DialogTitle>
+            <DialogDescription>Detailed performance breakdown by strategy</DialogDescription>
+          </DialogHeader>
+          
+          {selectedSymbolData && (
+            <div className="space-y-4">
+              {selectedSymbolData.strategies.map((strat: any, idx: number) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="p-4 rounded-lg border border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 to-background"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-foreground text-lg">{strat.setup}</h4>
+                    <Badge className={`${strat.winrate > 55 ? 'bg-emerald-500/30 text-emerald-400' : strat.winrate > 45 ? 'bg-slate-500/30 text-slate-300' : 'bg-red-500/30 text-red-400'}`}>
+                      {strat.winrate.toFixed(1)}% WR
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="flex flex-col">
+                      <p className="text-xs text-muted-foreground">Trades</p>
+                      <p className="text-lg font-bold text-foreground">{strat.trades}</p>
+                    </div>
+                    <div className="flex flex-col">
+                      <p className="text-xs text-muted-foreground">Win Rate</p>
+                      <p className="text-lg font-bold text-indigo-400">{strat.winrate.toFixed(1)}%</p>
+                    </div>
+                    <div className="flex flex-col">
+                      <p className="text-xs text-muted-foreground">Net P&L</p>
+                      <p className={`text-lg font-bold ${strat.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {strat.pnl >= 0 ? '+' : ''}{strat.pnl} pts
+                      </p>
+                    </div>
+                    <div className="flex flex-col">
+                      <p className="text-xs text-muted-foreground">Avg RR</p>
+                      <p className="text-lg font-bold text-cyan-400">1:{strat.avgRR.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+              
+              <div className="pt-4 border-t border-border">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Total Trades</p>
+                    <p className="text-2xl font-bold text-foreground">{selectedSymbolData.strategies.reduce((sum: number, s: any) => sum + s.trades, 0)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Avg Win Rate</p>
+                    <p className="text-2xl font-bold text-indigo-400">{(selectedSymbolData.strategies.reduce((sum: number, s: any) => sum + s.winrate, 0) / selectedSymbolData.strategies.length).toFixed(1)}%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Total P&L</p>
+                    <p className={`text-2xl font-bold ${selectedSymbolData.strategies.reduce((sum: number, s: any) => sum + s.pnl, 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {selectedSymbolData.strategies.reduce((sum: number, s: any) => sum + s.pnl, 0) >= 0 ? '+' : ''}{selectedSymbolData.strategies.reduce((sum: number, s: any) => sum + s.pnl, 0)} pts
+                    </p>
+                  </div>
+                </div>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
-              {/* 💡 Trading Summary */}
-              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.48 }} className="mb-6">
-                <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-cyan-600/20 via-cyan-500/10 to-background">
-                  <div className="p-8">
-                    <div className="flex gap-4 items-start">
-                      <div className="text-5xl">💡</div>
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-bold text-cyan-300 mb-3">Trading Summary</h3>
-                        <p className="text-base leading-relaxed text-foreground/90">{aiInsights.summaryInsight}</p>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
+        </>
+      )}
 
-              {/* ⚠️ Biggest Mistake Analysis */}
-              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.51 }} className="mb-6">
-                <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-amber-600/20 via-amber-500/10 to-background">
-                  <div className="p-8">
-                    <div className="flex gap-4 items-start">
-                      <div className="text-5xl">⚠️</div>
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-bold text-amber-300 mb-4">Your Biggest Mistake Cost</h3>
-                        <p className="text-base leading-relaxed text-foreground/90 mb-4">{aiInsights.mistakeExplanation}</p>
-                        <div className="p-5 rounded-xl bg-amber-500/15 border border-amber-500/30 backdrop-blur-sm">
-                          <p className="text-sm font-semibold text-amber-200 mb-2">💡 The Fix:</p>
-                          <p className="text-sm text-foreground/80">{aiInsights.mistakeFix}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-
-              {/* 🎯 Next Week Action Plan */}
-              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.54 }}>
-                <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-emerald-600/20 via-emerald-500/10 to-background">
-                  <div className="p-8">
-                    <div className="flex gap-4 items-start">
-                      <div className="text-5xl">🎯</div>
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-bold text-emerald-300 mb-6">Next Week Action Plan</h3>
-                        
-                        {/* Trading Rules */}
-                        <div className="mb-6">
-                          <h4 className="text-lg font-semibold text-emerald-200 mb-4 flex items-center gap-2">
-                            <span>📋</span>
-                            <span>Trading Rules to Follow</span>
-                          </h4>
-                          <ul className="space-y-3">
-                            {aiInsights.actionPlan.rules.map((rule, i) => (
-                              <li key={i} className="flex gap-3 items-start p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors">
-                                <span className="text-emerald-400 font-bold text-lg flex-shrink-0">✓</span>
-                                <span className="text-sm text-foreground/90">{rule}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-
-                        {/* Daily Checklist */}
-                        <div>
-                          <h4 className="text-lg font-semibold text-emerald-200 mb-4 flex items-center gap-2">
-                            <span>📊</span>
-                            <span>Daily Checklist</span>
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {aiInsights.actionPlan.checklist.map((item, i) => (
-                              <div key={i} className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40 hover:bg-emerald-500/15 transition-all">
-                                <p className="text-xs font-semibold text-emerald-200 uppercase tracking-wide">{item.label}</p>
-                                <p className="text-2xl font-bold text-emerald-300 mt-2">{item.value}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            </motion.div>
-          </div>
-        )
-      })()}
-            </>
-          );
-        })()}
     </div>
   )
 }

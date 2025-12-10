@@ -1,9 +1,11 @@
 import React from 'react';
 import { useAdmin } from '@/lib/AdminContext';
+import { useAuth } from '@/lib/AuthProvider';
 import UnderMaintenance from '@/pages/UnderMaintenance';
-import { Unlock } from 'lucide-react';
+import { Unlock, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 interface FeatureGuardProps {
   feature: 'propfirm' | 'journal';
@@ -12,7 +14,16 @@ interface FeatureGuardProps {
 
 const FeatureGuard: React.FC<FeatureGuardProps> = ({ feature, children }) => {
   const { adminSettings, togglePropFirmLock, toggleJournalLock } = useAdmin();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [isToggling, setIsToggling] = React.useState(false);
+
+  // Check if user is admin
+  const isAdmin = React.useMemo(() => {
+    if (!user) return false;
+    const userRole = (user?.user_metadata?.role || user?.app_metadata?.role) as string;
+    return userRole === 'admin';
+  }, [user]);
 
   // Check maintenance mode first
   if (adminSettings.maintenance_mode) {
@@ -76,7 +87,7 @@ const FeatureGuard: React.FC<FeatureGuardProps> = ({ feature, children }) => {
               </>
             ) : (
               <>
-                <div className="text-6xl mb-4">🔨</div>
+                <div className="text-6xl mb-4">⚡</div>
                 <h2 className="text-3xl font-bold text-white mb-3">Coming Soon</h2>
                 <p className="text-gray-300 mb-6 text-sm leading-relaxed">
                   We're working hard to bring you the {featureTitle} feature. Check back soon!
@@ -89,25 +100,35 @@ const FeatureGuard: React.FC<FeatureGuardProps> = ({ feature, children }) => {
               <motion.div
                 className={lockType === 'premium' ? 'bg-purple-500' : 'bg-blue-500'}
                 initial={{ width: '0%' }}
-                animate={{ width: '60%' }}
+                animate={{ width: '30%' }}
                 transition={{ duration: 2, ease: 'easeOut' }}
                 style={{ height: '100%' }}
               />
             </div>
 
             {/* Unlock Button (Admin Only) */}
-            <Button
-              onClick={handleToggle}
-              disabled={isToggling}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-6 text-lg rounded-lg disabled:opacity-50"
-            >
-              <Unlock className="mr-2 w-5 h-5" />
-              {isToggling ? 'Toggling...' : `Unlock ${featureTitle}`}
-            </Button>
+            <div className="flex flex-col gap-3">
+              {/* Redirect to Journal (for all users) */}
+              <Button
+                onClick={() => navigate('/dashboard/journal')}
+                className="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-6 text-base rounded-lg transition-all"
+              >
+                <ArrowRight className="mr-2 w-5 h-5" />
+                Explore Journal Dashboard
+              </Button>
 
-            <p className="text-xs text-gray-500 mt-4">
-              Admin action - toggles the lock for all users
-            </p>
+              {/* Unlock Button (Admin Only) */}
+              {isAdmin && (
+                <Button
+                  onClick={handleToggle}
+                  disabled={isToggling}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-6 text-lg rounded-lg disabled:opacity-50"
+                >
+                  <Unlock className="mr-2 w-5 h-5" />
+                  {isToggling ? 'Toggling...' : `Unlock ${featureTitle}`}
+                </Button>
+              )}
+            </div>
           </motion.div>
         </div>
       </div>

@@ -4,12 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Link, useNavigate } from "react-router-dom";
-import { TrendingUp, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import supabase, { isSupabaseConfigured } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { getOAuthRedirectUrl, logOAuthSetupInstructions } from "@/lib/auth-helpers";
 import ParticleNetworkBackground from "@/components/ParticleNetworkBackground";
+import BrandLogo from "@/components/ui/BrandLogo";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -76,7 +77,9 @@ const Login = () => {
           )}
           <div className="flex justify-center mb-8">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-8 h-8 text-primary" />
+              <div className="w-8 h-8">
+                <BrandLogo />
+              </div>
               <span className="text-2xl font-bold">TradeOne</span>
             </div>
           </div>

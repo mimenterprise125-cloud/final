@@ -82,7 +82,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                       ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg hover:shadow-xl'
                       : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
                   }`}
-                  onClick={() => { setViewMode('propfirm'); navigate('/dashboard/'); }}
+                  onClick={() => { setViewMode('propfirm'); navigate('/dashboard/propfirm'); }}
                   aria-pressed={viewMode === 'propfirm'}
                 >
                   Prop Firms

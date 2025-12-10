@@ -20,11 +20,19 @@ const MaintenanceGuard: React.FC<MaintenanceGuardProps> = ({ children }) => {
 
   useEffect(() => {
     // Wait for both auth and admin settings to load
-    if (authLoading || adminLoading) return;
+    if (authLoading || adminLoading) {
+      console.log('⏳ Waiting for loading... authLoading:', authLoading, 'adminLoading:', adminLoading);
+      return;
+    }
+
+    console.log('🔍 MaintenanceGuard checking - maintenance_mode:', adminSettings.maintenance_mode, 'location:', location.pathname);
 
     // If maintenance mode is ON and we're NOT on the maintenance page, redirect
     if (adminSettings.maintenance_mode && location.pathname !== '/maintenance') {
+      console.log('🚨 Maintenance mode ON, redirecting to /maintenance');
       navigate('/maintenance', { replace: true });
+    } else if (!adminSettings.maintenance_mode && location.pathname === '/maintenance') {
+      console.log('✅ Maintenance mode OFF, allowing access');
     }
   }, [adminSettings.maintenance_mode, authLoading, adminLoading, navigate, location.pathname]);
 
