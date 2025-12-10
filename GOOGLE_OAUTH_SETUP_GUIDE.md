@@ -49,12 +49,13 @@ This guide will help you configure Google OAuth authentication for TradeOne with
    - Add Authorized JavaScript origins:
      - `http://localhost:5173` (local development)
      - `http://localhost:3000` (alternative local)
-     - `https://yourdomain.com` (production domain)
+     - `https://tradeone.vercel.app` (production domain)
    - Add Authorized redirect URIs:
      - `http://localhost:5173/auth/callback` (local)
      - `http://localhost:5173` (local fallback)
-     - `https://yourdomain.com/auth/callback` (production)
-     - `https://yourdomain.supabase.co/auth/v1/callback` (Supabase callback)
+     - `https://tradeone.vercel.app/auth/callback` (production)
+     - `https://tradeone.vercel.app/dashboard/journal` (production redirect)
+     - `https://jabzseuicykmvfedxbwn.supabase.co/auth/v1/callback` (Supabase callback)
    - Click **CREATE**
    - Copy your **Client ID** and **Client Secret**
 
@@ -73,13 +74,14 @@ This guide will help you configure Google OAuth authentication for TradeOne with
 Create or update your `.env.local` file in the project root:
 
 ```env
-# Google OAuth
-VITE_GOOGLE_CLIENT_ID=your_client_id_from_step_3.apps.googleusercontent.com
-
 # Supabase
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your_anon_key_here
 ```
+
+**Note:** You don't need `VITE_GOOGLE_CLIENT_ID` because Supabase handles the OAuth flow on the backend. The Google Client ID & Secret are only needed in:
+- Google Cloud Console (to generate credentials)
+- Supabase Admin Panel (Authentication > Providers > Google)
 
 ## 🔄 Step 6: Configure Redirect Logic in AuthProvider
 

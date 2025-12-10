@@ -15,6 +15,7 @@ import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import Signup from "./pages/Signup";
 import ResetPassword from "./pages/ResetPassword";
+import { AuthCallback } from "./pages/auth/callback";
 import PropFirmDashboard from "./pages/dashboard/PropFirmDashboard";
 import JournalDashboard from "./pages/dashboard/JournalDashboard";
 import Accounts from "./pages/dashboard/Accounts";
@@ -50,6 +51,9 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/pricing" element={<Pricing />} />
+
+          {/* OAuth Callback */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={<AuthGuard><Admin /></AuthGuard>} />
