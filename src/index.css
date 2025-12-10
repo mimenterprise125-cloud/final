@@ -5,6 +5,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent zoom on mobile devices */
+html {
+  touch-action: pan-x pan-y;
+}
+
+body {
+  touch-action: manipulation;
+}
+
+input,
+button,
+textarea,
+select {
+  touch-action: manipulation;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

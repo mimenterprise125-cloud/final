@@ -86,9 +86,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           <span className="text-sm font-semibold text-muted-foreground">{sidebarOpen ? 'Hide' : 'Show'} Sidebar</span>
         </div>
 
-        <main className={cn("flex-1 overflow-auto transition-all duration-300")}>
+        <main className={cn("flex-1 overflow-auto transition-all duration-300 w-full")}>
           {/* Responsive padding and view mode toggle */}
-          <div className="p-3 sm:p-4 lg:p-8 space-y-4 sm:space-y-6">
+          <div className="p-3 sm:p-4 lg:p-8 space-y-4 sm:space-y-6 w-full overflow-x-hidden">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="inline-flex rounded-lg bg-muted/50 border border-border/60 p-1 sm:p-1.5 shadow-sm backdrop-blur-sm">
                 <button
