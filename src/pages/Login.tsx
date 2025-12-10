@@ -48,7 +48,7 @@ const Login = () => {
 
     const { error } = await supabase.auth.signInWithOAuth({ 
       provider: 'google', 
-      options: { redirectTo: getOAuthRedirectUrl('/dashboard/journal') }
+      options: { redirectTo: getOAuthRedirectUrl('/auth/callback') }
     })
     if (error) {
       toast({ title: 'OAuth failed', description: error.message, variant: 'destructive' })

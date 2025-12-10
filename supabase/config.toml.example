@@ -1,0 +1,134 @@
+# ============================================================================
+# SUPABASE LOCAL DEVELOPMENT CONFIGURATION
+# ============================================================================
+# This file is used when running: supabase start
+# For production, use Supabase Dashboard to configure these settings
+#
+# Location: supabase/config.toml
+# Reference: https://supabase.com/docs/guides/self-hosting/docker
+# ============================================================================
+
+# Project Configuration
+[project]
+# Your Supabase project ID (from dashboard)
+project_id = "your-project-id"
+
+# Organization ID (optional)
+# org_id = ""
+
+# Enable anonymous sign-ups
+[auth]
+enable_signup = true
+
+# ============================================================================
+# GOOGLE OAUTH PROVIDER CONFIGURATION
+# ============================================================================
+# Reference: https://supabase.com/docs/guides/auth/social-login/auth-google
+#
+# To get your Google credentials:
+# 1. Go to https://console.cloud.google.com/
+# 2. Create a new project or select existing
+# 3. Go to "APIs & Services" > "Credentials"
+# 4. Create "OAuth 2.0 Client ID" (Web application)
+# 5. Add authorized redirect URIs:
+#    - https://your-project.supabase.co/auth/v1/callback
+#    - http://localhost:3000 (for local development)
+#    - http://localhost:5173 (for Vite local development)
+# 6. Copy the Client ID and Client Secret below
+
+[auth.external.google]
+# Enable Google authentication
+enabled = true
+
+# Google OAuth 2.0 Client ID
+# Get from: Google Cloud Console > APIs & Services > Credentials
+client_id = "your-google-client-id.apps.googleusercontent.com"
+
+# Google OAuth 2.0 Client Secret
+# IMPORTANT: Store this securely, never commit to git
+# Can use env var: secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET)"
+# See: https://supabase.com/docs/guides/self-hosting/docker#using-environment-variables
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET)"
+
+# Redirect URI (optional override)
+# redirect_uri = "https://your-project.supabase.co/auth/v1/callback"
+
+# Whether to skip PKCE nonce verification for this provider
+# Set to true only if you have specific requirements
+skip_nonce_check = false
+
+# Scopes requested from Google
+# Default: openid profile email
+# Add more if needed (see Google OAuth scopes documentation)
+scopes = ["openid", "profile", "email"]
+
+# ============================================================================
+# DATABASE CONFIGURATION
+# ============================================================================
+[db]
+# PostgreSQL version for local development
+major_version = 15
+
+# Connection timeout (in seconds)
+# reset_on_restart = true
+
+# ============================================================================
+# VECTOR CONFIGURATION (if using pgvector)
+# ============================================================================
+# [vector]
+# enabled = false
+
+# ============================================================================
+# EMAIL PROVIDER CONFIGURATION
+# ============================================================================
+# For development, use the built-in email service
+# For production, configure SMTP or Mailgun
+
+[auth.email]
+# Enable email authentication
+enabled = true
+
+# Email rate limit (in seconds)
+rate_limit_seconds = 3600
+
+# ============================================================================
+# JWT CONFIGURATION
+# ============================================================================
+[auth.jwt]
+# JWT expiration time (in seconds) - 1 hour
+exp = 3600
+
+# Refresh token expiration time (in seconds) - 7 days
+refresh_token_rotation_enabled = true
+refresh_token_reuse_interval = 10
+
+# ============================================================================
+# SITE URL & REDIRECT URLS
+# ============================================================================
+# These are configured in Supabase Dashboard:
+# Authentication > URL Configuration
+#
+# Site URL: Where your app is hosted
+# Redirect URLs: Where users can be redirected after authentication
+
+# Development URLs (for local testing)
+# - http://localhost:5173
+# - http://localhost:5173/#/auth/callback
+# - http://localhost:5173/#/dashboard/journal
+#
+# Production URLs (update when deploying)
+# - https://yourdomain.com
+# - https://yourdomain.com/#/auth/callback
+# - https://yourdomain.com/#/dashboard/journal
+
+# ============================================================================
+# STORAGE CONFIGURATION
+# ============================================================================
+[storage]
+# File size limit (5 MB = 5242880 bytes)
+file_size_limit = 5242880
+
+# S3 endpoint (leave as-is for local development)
+# s3_host = "storage"
+# s3_protocol = "http://"
+# s3_port = 9000

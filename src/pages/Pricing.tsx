@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthProvider';
 import { useNavigate } from 'react-router-dom';
+import Footer from '@/components/Footer';
 
 interface PricingTier {
   id: string;
@@ -302,6 +303,9 @@ const Pricing: React.FC = () => {
           </div>
         </motion.div>
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

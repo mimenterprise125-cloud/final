@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/AuthProvider'
 import { useAdmin } from '@/lib/AdminContext'
 import supabase from '@/lib/supabase'
 import { motion } from 'framer-motion'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { TrendingUp, TrendingDown, Target, AlertCircle, Zap, Lightbulb, CheckCircle2, AlertTriangle } from 'lucide-react'
 import UnderDevelopment from '@/components/UnderDevelopment'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
@@ -101,7 +101,7 @@ const Performance = () => {
         const r = (rows || []).sort((a:any, b:any) => new Date(a.entry_at || a.created_at).getTime() - new Date(b.entry_at || b.created_at).getTime())
 
         // 1. BASIC METRICS
-        const pnlVals = r.map((x:any) => Number(x.realized_points || x.realized_amount || 0)).filter((n:any) => Number.isFinite(n))
+        const pnlVals = r.map((x:any) => Number(x.realized_amount || 0)).filter((n:any) => Number.isFinite(n))
         const wins = pnlVals.filter((n:any) => n > 0).length
         const losses = pnlVals.filter((n:any) => n < 0).length
         const totalTrades = r.length
@@ -141,7 +141,7 @@ const Performance = () => {
         // 5. EQUITY CURVE DATA
         let runningTotal = 0
         const eqData = r.map((trade:any, idx:number) => {
-          runningTotal += Number(trade.realized_points || trade.realized_amount || 0)
+          runningTotal += Number(trade.realized_amount || 0)
           const date = new Date(trade.entry_at || trade.created_at)
           return { 
             date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), 
@@ -154,32 +154,33 @@ const Performance = () => {
         // 6. RR EFFICIENCY
         const rrList: any[] = []
         for (const row of r) {
-          const entry = Number(row.entry_price)
-          const target = Number(row.target_price)
-          const stop = Number(row.stop_loss_price)
-          const exitPrice = Number(row.exit_price)
-          const pnl = Number(row.realized_points || row.realized_amount || 0)
+          const riskPoints = Number(row.stop_loss_points || 0)  // |entry - SL|
+          const rewardPoints = Number(row.target_points || 0)   // |entry - TP|
+          const realizedAmount = Number(row.realized_amount || 0)
           
-          // Calculate Target RR (planned) using entry_price and target_price/stop_loss_price
-          if (entry && target && stop && Number.isFinite(entry) && Number.isFinite(target) && Number.isFinite(stop)) {
-            const targetReward = Math.abs(target - entry)
-            const actualRisk = Math.abs(entry - stop)
-            
-            // Calculate Achieved RR using entry_price and exit_price
-            let achievedRR = 0
-            if (exitPrice && Number.isFinite(exitPrice) && actualRisk > 0) {
-              const achievedReward = Math.abs(exitPrice - entry)
-              achievedRR = achievedReward / actualRisk
-            } else if (actualRisk > 0) {
-              // Fallback to using realized points
-              const achievedReward = Math.abs(pnl)
-              achievedRR = achievedReward / actualRisk
+          // Calculate Planned RR using points
+          let targetRR = 0
+          if (riskPoints > 0) {
+            targetRR = rewardPoints / riskPoints
+          }
+          
+          // Calculate Achieved RR
+          let achievedRR = targetRR  // Default to target if no manual exit
+          if (row.result === 'MANUAL' && riskPoints > 0) {
+            // For manual exits, use the actual realized_amount (can be positive or negative)
+            achievedRR = realizedAmount / riskPoints
+          } else if ((row.result === 'TP' || row.result === 'SL') && riskPoints > 0) {
+            // For TP: achieved is same as target (hit the target)
+            // For SL: achieved is -1 (hit the stop loss, negative return)
+            if (row.result === 'TP') {
+              achievedRR = rewardPoints / riskPoints
+            } else if (row.result === 'SL') {
+              achievedRR = -1  // -1 RR when stopped out
             }
-            
-            if (actualRisk > 0) {
-              const targetRR = targetReward / actualRisk
-              rrList.push({ target: targetRR, achieved: achievedRR, name: `Trade ${rrList.length + 1}` })
-            }
+          }
+          
+          if (riskPoints > 0) {
+            rrList.push({ target: targetRR, achieved: achievedRR, name: `Trade ${rrList.length + 1}` })
           }
         }
         const avgTargetRR = rrList.length ? rrList.reduce((s:any, x:any) => s + x.target, 0) / rrList.length : 0
@@ -190,7 +191,7 @@ const Performance = () => {
         const bySetup: Record<string, { wins:number, total:number }> = {}
         for (const row of r) {
           const setup = (row.setup || '—').toString()
-          const pnl = Number(row.realized_points || row.realized_amount || 0)
+          const pnl = Number(row.realized_amount || 0)
           if (!bySetup[setup]) bySetup[setup] = { wins: 0, total: 0 }
           if (pnl > 0) bySetup[setup].wins += 1
           bySetup[setup].total += 1
@@ -203,7 +204,7 @@ const Performance = () => {
         for (const row of r) {
           const symbol = (row.symbol || row.instrument || '—').toString().toUpperCase()
           const setup = (row.setup || '—').toString()
-          const pnl = Number(row.realized_points || row.realized_amount || 0)
+          const pnl = Number(row.realized_amount || 0)
           const achievedRR = row.achieved_rr ? Number(row.achieved_rr) : 0
           
           if (!bySymbolSetup[symbol]) bySymbolSetup[symbol] = {}
@@ -230,16 +231,30 @@ const Performance = () => {
         if (mounted) setSymbolStrategyMatrix(matrixData)
 
         // 8. SESSION ANALYSIS
-        const bySession: Record<string, { wins:number, total:number, pnl:number }> = {}
+        const bySession: Record<string, { wins:number, total:number, pnl:number, totalRR:number }> = {}
         for (const row of r) {
           const session = (row.session || '—').toString()
-          const pnl = Number(row.realized_points || row.realized_amount || 0)
-          if (!bySession[session]) bySession[session] = { wins: 0, total: 0, pnl: 0 }
+          const pnl = Number(row.realized_amount || 0)
+          const riskPoints = Number(row.stop_loss_points || 0)
+          const rewardPoints = Number(row.target_points || 0)
+          
+          // Calculate achieved RR using same logic as main metrics
+          let achievedRR = 0
+          if (row.result === 'MANUAL' && riskPoints > 0) {
+            achievedRR = pnl / riskPoints
+          } else if (row.result === 'TP' && riskPoints > 0) {
+            achievedRR = rewardPoints / riskPoints
+          } else if (row.result === 'SL') {
+            achievedRR = -1
+          }
+          
+          if (!bySession[session]) bySession[session] = { wins: 0, total: 0, pnl: 0, totalRR: 0 }
           if (pnl > 0) bySession[session].wins += 1
           bySession[session].total += 1
           bySession[session].pnl += pnl
+          bySession[session].totalRR += achievedRR
         }
-        const sessionStats = Object.entries(bySession).map(([name, obj]) => ({ name, winrate: obj.total ? (obj.wins/obj.total)*100 : 0, pnl: Math.round(obj.pnl * 100) / 100, trades: obj.total }))
+        const sessionStats = Object.entries(bySession).map(([name, obj]) => ({ name, winrate: obj.total ? (obj.wins/obj.total)*100 : 0, pnl: Math.round(obj.pnl * 100) / 100, trades: obj.total, avgRR: obj.total ? Math.round((obj.totalRR / obj.total) * 100) / 100 : 0 }))
         if (mounted) setSessionData(sessionStats)
 
         // 9. TIME-OF-DAY ANALYSIS
@@ -247,7 +262,7 @@ const Performance = () => {
         for (const row of r) {
           const hour = new Date(row.entry_at || row.created_at).getHours()
           const period = hour < 12 ? 'Morning (8-12)' : hour < 18 ? 'Afternoon (12-6)' : 'Evening (6+)'
-          const pnl = Number(row.realized_points || row.realized_amount || 0)
+          const pnl = Number(row.realized_amount || 0)
           if (!byHour[period]) byHour[period] = { wins: 0, total: 0 }
           if (pnl > 0) byHour[period].wins += 1
           byHour[period].total += 1
@@ -256,7 +271,7 @@ const Performance = () => {
         // 10. MISTAKE COST
         const mistakes: { cost: number, reason: string }[] = []
         for (const row of r) {
-          const pnl = Number(row.realized_points || row.realized_amount || 0)
+          const pnl = Number(row.realized_amount || 0)
           if (pnl < 0) {
             const reason = row.exit_reason || 'Unspecified loss'
             mistakes.push({ cost: Math.abs(pnl), reason })
@@ -315,126 +330,212 @@ const Performance = () => {
       {/* PERFORMANCE OVERVIEW - KEY METRICS */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <MetricCard title="Expectancy per Trade" value={`${metrics.expectancy ?? 0}${typeof metrics.expectancy === 'number' ? ' pts' : ''}`} hint={`Expected ${(metrics.projectedGain ?? 0).toFixed(0)} pts per 100 trades`} icon={Target} trend={(metrics.expectancy ?? 0) > 0 ? 'up' : 'down'} />
+          <MetricCard title="Expectancy per Trade" value={`${typeof metrics.expectancy === 'number' ? '$' + metrics.expectancy.toFixed(2) : '—'}`} hint={`Expected $${(metrics.projectedGain ?? 0).toFixed(2)} per 100 trades`} icon={Target} trend={(metrics.expectancy ?? 0) > 0 ? 'up' : 'down'} />
           <MetricCard title="Win Rate" value={`${metrics.winRate ?? 0}%`} hint={`${metrics.wins ?? 0} wins / ${metrics.losses ?? 0} losses`} icon={TrendingUp} trend={(metrics.winRate ?? 0) > 50 ? 'up' : 'down'} />
           <MetricCard title="Max Win Streak" value={metrics.maxWinStreak ?? 0} hint="Consecutive winning trades" icon={Zap} trend="up" />
           <MetricCard title="Max Loss Streak" value={metrics.maxLossStreak ?? 0} hint="Longest losing sequence" icon={TrendingDown} trend="down" />
-          <MetricCard title="Max Drawdown" value={`${metrics.maxDD ?? 0} pts`} hint={`Average: ${metrics.avgDD ?? 0} pts`} icon={AlertCircle} trend="down" />
+          <MetricCard title="Max Drawdown" value={`$${metrics.maxDD ?? 0}`} hint={`Average: $${metrics.avgDD ?? 0}`} icon={AlertCircle} trend="down" />
           <MetricCard title="Consistency Score" value={`${metrics.consistencyScore ?? 0}/100`} hint="Overall trading discipline" icon={Target} trend={(metrics.consistencyScore ?? 0) > 70 ? 'up' : 'neutral'} />
           <MetricCard title="RR Achieved" value={`1:${Math.round(metrics.avgAchievedRR ?? 0)}`} hint={`Target: 1:${Math.round(metrics.avgTargetRR ?? 0)}`} trend={(metrics.avgAchievedRR ?? 0) >= (metrics.avgTargetRR ?? 0) ? 'up' : 'down'} />
-          <MetricCard title="Total P&L" value={`${(metrics.totalPnL ?? 0) >= 0 ? '+' : ''}${metrics.totalPnL ?? 0} pts`} hint={`${metrics.totalTrades ?? 0} trades`} icon={TrendingUp} trend={(metrics.totalPnL ?? 0) > 0 ? 'up' : (metrics.totalPnL ?? 0) < 0 ? 'down' : 'neutral'} />
+          <MetricCard title="Total P&L" value={`${(metrics.totalPnL ?? 0) >= 0 ? '+' : ''}$${metrics.totalPnL ?? 0}`} hint={`${metrics.totalTrades ?? 0} trades`} icon={TrendingUp} trend={(metrics.totalPnL ?? 0) > 0 ? 'up' : (metrics.totalPnL ?? 0) < 0 ? 'down' : 'neutral'} />
         </div>
       </motion.div>
 
-      {/* EQUITY CURVE */}
+      {/* TRADE RESULTS BREAKDOWN PIE CHART */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-        <SectionHeader icon="" title="Equity Curve Simulator" />
-        <Card className="p-3 sm:p-6 border border-cyan-500/30 shadow-lg hover:shadow-2xl hover:border-cyan-500/50 transition-all duration-300 bg-gradient-to-br from-cyan-500/5 via-slate-900/20 to-background relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-full blur-3xl -z-10" />
+        <SectionHeader icon="" title="Trade Results Distribution" />
+        <Card className="p-4 sm:p-5 border border-violet-500/30 shadow-2xl hover:shadow-3xl hover:border-violet-500/50 transition-all duration-300 bg-gradient-to-br from-violet-500/5 via-slate-900/20 to-background relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-60 h-60 bg-gradient-to-br from-violet-500/15 to-transparent rounded-full blur-3xl -z-10" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full blur-3xl -z-10" />
           
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
-            <div>
-              <p className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider">Account Growth</p>
-              <p className="text-xs text-muted-foreground mt-1">Cumulative P&L progression over time</p>
-            </div>
-            {equityData.length > 0 && (
-              <Badge className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 border border-cyan-500/30">
-                {equityData.length} snapshots
-              </Badge>
-            )}
-          </div>
+          {entries.length > 0 ? (() => {
+            const profits = entries.filter((t:any) => Number(t.realized_amount || 0) > 0).length
+            const losses = entries.filter((t:any) => Number(t.realized_amount || 0) < 0).length
+            const breakeven = entries.filter((t:any) => Number(t.realized_amount || 0) === 0).length
+            const manual = entries.filter((t:any) => t.result === 'MANUAL').length
+            const totalTrades = entries.length
+            
+            const resultBreakdown = [
+              { name: 'Profit', value: profits, color: '#10b981' },
+              { name: 'Loss', value: losses, color: '#ef4444' },
+              { name: 'Breakeven', value: breakeven, color: '#6b7280' },
+              { name: 'Manual Exit', value: manual, color: '#f59e0b' }
+            ].filter(item => item.value > 0)
 
-          <div style={{ height: 280, minHeight: 280 }} className="w-full">
-            {equityData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={equityData}>
-                  <defs>
-                    <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="rgb(34, 197, 94)" stopOpacity={0.8}/>
-                      <stop offset="45%" stopColor="rgb(6, 182, 212)" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="rgb(6, 182, 212)" stopOpacity={0.05}/>
-                    </linearGradient>
-                    <linearGradient id="equityShadowGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="rgb(6, 182, 212)" stopOpacity={0.3}/>
-                      <stop offset="100%" stopColor="rgb(6, 182, 212)" stopOpacity={0.0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid 
-                    strokeDasharray="3 3" 
-                    stroke="hsl(var(--border))" 
-                    opacity={0.15}
-                    vertical={false}
-                  />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="hsl(var(--muted-foreground))" 
-                    style={{ fontSize: '12px' }}
-                    opacity={0.6}
-                  />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))" 
-                    style={{ fontSize: '12px' }}
-                    opacity={0.6}
-                    domain={['auto', 'auto']}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--card))", 
-                      border: "2px solid rgb(6, 182, 212)",
-                      borderRadius: '8px',
-                      boxShadow: '0 10px 30px rgba(6, 182, 212, 0.2)'
-                    }}
-                    formatter={(value: any) => [`${value.toFixed(2)} pts`, 'Cumulative P&L']}
-                    labelFormatter={(label) => `${label}`}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="equity" 
-                    stroke="rgb(34, 197, 94)" 
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: 'rgb(6, 182, 212)' }}
-                    activeDot={{ r: 6, fill: 'rgb(34, 197, 94)' }}
-                    isAnimationActive={true}
-                    animationDuration={1000}
-                    fillOpacity={0.3}
-                    fill="url(#equityShadowGradient)"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2"
-              >
-                <AlertTriangle className="w-8 h-8 opacity-50" />
-                <div className="text-center">
-                  <p className="font-semibold">No trading data yet</p>
-                  <p className="text-xs mt-1">Execute trades to see your equity curve</p>
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-7 gap-8 items-center">
+                {/* Bigger Donut Chart - Left (3 cols) */}
+                <div className="lg:col-span-3 flex items-center justify-center" style={{ minHeight: 450 }}>
+                  {resultBreakdown.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={450}>
+                      <PieChart>
+                        <Pie
+                          data={resultBreakdown}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={110}
+                          outerRadius={160}
+                          paddingAngle={2}
+                          dataKey="value"
+                          animationDuration={1200}
+                          animationEasing="ease-out"
+                          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                          labelLine={true}
+                        >
+                          {resultBreakdown.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={entry.color} 
+                              opacity={0.92}
+                              stroke="rgba(0,0,0,0.2)"
+                              strokeWidth={0.5}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: "rgba(15, 23, 42, 0.95)", 
+                            border: "2px solid rgb(167, 139, 250)",
+                            borderRadius: '12px',
+                            boxShadow: '0 20px 40px rgba(167, 139, 250, 0.3)',
+                            padding: '12px'
+                          }}
+                          formatter={(value: any, name: any, props: any) => [
+                            `${value} trades (${((value/totalTrades)*100).toFixed(1)}%)`,
+                            props.payload.name
+                          ]}
+                          labelStyle={{ color: '#fff' }}
+                          cursor={{ fill: 'rgba(167, 139, 250, 0.1)' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-sm text-muted-foreground">No data</p>
+                    </div>
+                  )}
                 </div>
-              </motion.div>
-            )}
-          </div>
 
-          {equityData.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-cyan-500/20 grid grid-cols-3 gap-3 text-xs">
-              <div className="p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
-                <p className="text-muted-foreground mb-0.5">Starting Equity</p>
-                <p className="font-bold text-cyan-400">${(equityData[0]?.equity ?? 0).toFixed(2)}</p>
+                {/* Stats Grid 2x2 - Right (Smaller, 4 cols) */}
+                <div className="lg:col-span-4 grid grid-cols-2 gap-3 sm:gap-4">
+                  {/* Profit Box */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.1, duration: 0.5 }}
+                    className="group p-4 sm:p-5 rounded-lg bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-background/50 border-2 border-emerald-500/40 hover:border-emerald-500/70 hover:shadow-lg hover:shadow-emerald-500/15 transition-all duration-300 backdrop-blur-sm"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div>
+                        <p className="text-xs text-emerald-400 font-bold uppercase tracking-wider">Winning</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-emerald-400 mt-0.5">{profits}</p>
+                      </div>
+                      <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+                        <span className="text-lg">✓</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-emerald-500/20 rounded-full h-1.5">
+                      <div 
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${(profits / totalTrades) * 100}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs font-bold text-emerald-400 mt-2">{((profits / totalTrades) * 100).toFixed(1)}%</p>
+                  </motion.div>
+
+                  {/* Loss Box */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.15, duration: 0.5 }}
+                    className="group p-4 sm:p-5 rounded-lg bg-gradient-to-br from-red-500/15 via-red-500/5 to-background/50 border-2 border-red-500/40 hover:border-red-500/70 hover:shadow-lg hover:shadow-red-500/15 transition-all duration-300 backdrop-blur-sm"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div>
+                        <p className="text-xs text-red-400 font-bold uppercase tracking-wider">Losing</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-red-400 mt-0.5">{losses}</p>
+                      </div>
+                      <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+                        <span className="text-lg">✕</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-red-500/20 rounded-full h-1.5">
+                      <div 
+                        className="bg-red-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${(losses / totalTrades) * 100}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs font-bold text-red-400 mt-2">{((losses / totalTrades) * 100).toFixed(1)}%</p>
+                  </motion.div>
+
+                  {/* Breakeven Box */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.2, duration: 0.5 }}
+                    className="group p-4 sm:p-5 rounded-lg bg-gradient-to-br from-gray-500/15 via-gray-500/5 to-background/50 border-2 border-gray-500/40 hover:border-gray-500/70 hover:shadow-lg hover:shadow-gray-500/15 transition-all duration-300 backdrop-blur-sm"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div>
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Breakeven</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-gray-400 mt-0.5">{breakeven}</p>
+                      </div>
+                      <div className="w-10 h-10 rounded-lg bg-gray-500/20 flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+                        <span className="text-lg">=</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-500/20 rounded-full h-1.5">
+                      <div 
+                        className="bg-gray-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${(breakeven / totalTrades) * 100}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs font-bold text-gray-400 mt-2">{((breakeven / totalTrades) * 100).toFixed(1)}%</p>
+                  </motion.div>
+
+                  {/* Manual Exit Box */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.25, duration: 0.5 }}
+                    className="group p-4 sm:p-5 rounded-lg bg-gradient-to-br from-amber-500/15 via-amber-500/5 to-background/50 border-2 border-amber-500/40 hover:border-amber-500/70 hover:shadow-lg hover:shadow-amber-500/15 transition-all duration-300 backdrop-blur-sm"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div>
+                        <p className="text-xs text-amber-400 font-bold uppercase tracking-wider">Manual</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-amber-400 mt-0.5">{manual}</p>
+                      </div>
+                      <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+                        <span className="text-lg">⚙</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-amber-500/20 rounded-full h-1.5">
+                      <div 
+                        className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${(manual / totalTrades) * 100}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs font-bold text-amber-400 mt-2">{((manual / totalTrades) * 100).toFixed(1)}%</p>
+                  </motion.div>
+                </div>
               </div>
-              <div className="p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
-                <p className="text-muted-foreground mb-0.5">Current Equity</p>
-                <p className={`font-bold ${(equityData[equityData.length - 1]?.equity ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  ${(equityData[equityData.length - 1]?.equity ?? 0).toFixed(2)}
-                </p>
+            )
+          })() : (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3"
+            >
+              <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+                <AlertTriangle className="w-10 h-10 opacity-40" />
               </div>
-              <div className="p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
-                <p className="text-muted-foreground mb-0.5">Total Return</p>
-                <p className={`font-bold ${((equityData[equityData.length - 1]?.equity ?? 0) - (equityData[0]?.equity ?? 0)) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {(((equityData[equityData.length - 1]?.equity ?? 0) - (equityData[0]?.equity ?? 0)) >= 0 ? '+' : '')}${((equityData[equityData.length - 1]?.equity ?? 0) - (equityData[0]?.equity ?? 0)).toFixed(2)}
-                </p>
-              </div>
-            </div>
+              <p className="font-semibold text-lg">No trading data yet</p>
+              <p className="text-sm">Execute trades to see your results distribution</p>
+            </motion.div>
           )}
         </Card>
       </motion.div>
@@ -508,39 +609,84 @@ const Performance = () => {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <p className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider">RR Comparison</p>
-                        <p className="text-xs text-muted-foreground mt-1">Target vs Achieved on last 15 trades</p>
+                        <p className="text-xs text-muted-foreground mt-1">Planned vs Achieved RR on each trade</p>
                       </div>
                     </div>
                     
-                    <div style={{ height: 250 }}>
+                    <div style={{ height: 280, width: '100%' }}>
                       {rrData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={rrData.slice(-15)}>
+                        <ResponsiveContainer width="100%" height={280}>
+                          <LineChart data={rrData.slice(-20)}>
                             <defs>
-                              <linearGradient id="rrTargetGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity={0.6}/>
-                                <stop offset="100%" stopColor="rgb(34, 197, 94)" stopOpacity={0.2}/>
+                              <linearGradient id="rrTargetLineGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity={0.3}/>
+                                <stop offset="100%" stopColor="rgb(34, 197, 94)" stopOpacity={0.01}/>
                               </linearGradient>
-                              <linearGradient id="rrAchievedGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="rgb(6, 182, 212)" stopOpacity={0.8}/>
-                                <stop offset="100%" stopColor="rgb(6, 182, 212)" stopOpacity={0.2}/>
+                              <linearGradient id="rrAchievedLineGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="rgb(6, 182, 212)" stopOpacity={0.3}/>
+                                <stop offset="100%" stopColor="rgb(6, 182, 212)" stopOpacity={0.01}/>
                               </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.15} vertical={false} />
-                            <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '10px' }} opacity={0.6} />
-                            <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '11px' }} opacity={0.6} domain={[0, 'auto']} />
+                            <XAxis 
+                              dataKey="name" 
+                              stroke="hsl(var(--muted-foreground))" 
+                              style={{ fontSize: '11px' }} 
+                              opacity={0.6}
+                              tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                            />
+                            <YAxis 
+                              stroke="hsl(var(--muted-foreground))" 
+                              style={{ fontSize: '11px' }} 
+                              opacity={0.6}
+                              domain={[0, Math.max(5, ...(rrData.map((d:any) => Math.max(d.target || 0, d.achieved || 0)) ?? [0]))]}
+                              tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                            />
                             <Tooltip 
                               contentStyle={{ 
                                 backgroundColor: "hsl(var(--card))", 
                                 border: "2px solid rgb(6, 182, 212)",
-                                borderRadius: '8px'
+                                borderRadius: '10px',
+                                boxShadow: '0 10px 30px rgba(6, 182, 212, 0.2)'
                               }}
-                              formatter={(value: any) => value.toFixed(2)}
+                              formatter={(value: any, name: string) => {
+                                const label = name === 'target' ? 'Planned RR' : 'Achieved RR'
+                                return [value.toFixed(2), label]
+                              }}
                               labelFormatter={(label) => `Trade ${label}`}
+                              cursor={{ stroke: 'rgba(6, 182, 212, 0.3)', strokeWidth: 2 }}
                             />
-                            <Bar dataKey="target" fill="url(#rrTargetGradient)" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="achieved" fill="url(#rrAchievedGradient)" radius={[4, 4, 0, 0]} />
-                          </BarChart>
+                            <Legend 
+                              wrapperStyle={{ paddingTop: '20px' }}
+                              iconType="line"
+                              formatter={(value) => value === 'target' ? 'Planned RR' : 'Achieved RR'}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="target" 
+                              stroke="rgb(34, 197, 94)" 
+                              strokeWidth={3}
+                              dot={{ fill: 'rgb(34, 197, 94)', r: 4, opacity: 0.7 }}
+                              activeDot={{ r: 6, fill: 'rgb(34, 197, 94)' }}
+                              fill="url(#rrTargetLineGradient)"
+                              isAnimationActive={true}
+                              animationDuration={800}
+                              name="target"
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="achieved" 
+                              stroke="rgb(6, 182, 212)" 
+                              strokeWidth={3}
+                              dot={{ fill: 'rgb(6, 182, 212)', r: 4, opacity: 0.7 }}
+                              activeDot={{ r: 6, fill: 'rgb(6, 182, 212)' }}
+                              fill="url(#rrAchievedLineGradient)"
+                              isAnimationActive={true}
+                              animationDuration={800}
+                              name="achieved"
+                              strokeDasharray="5 5"
+                            />
+                          </LineChart>
                         </ResponsiveContainer>
                       ) : (
                         <motion.div 
@@ -636,7 +782,8 @@ const Performance = () => {
           </div>
 
           {sessionData.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <>
+            <div className="hidden lg:grid lg:grid-cols-3 gap-4">
               {sessionData.map((session, i) => (
                 <motion.div
                   key={i}
@@ -648,27 +795,75 @@ const Performance = () => {
                     onClick={() => { setSelectedSession(session); setSessionModalOpen(true) }}
                     className="p-4 cursor-pointer hover:shadow-2xl transition-shadow border border-amber-500/10 bg-amber-500/5"
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{session.name}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{session.trades} trades</p>
-                      </div>
-                      <div className="text-right">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">{session.name}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{session.trades} trades</p>
+                        </div>
                         <Badge className={`${session.winrate > 55 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'} border-0`}>{session.winrate.toFixed(1)}%</Badge>
-                        <p className={`mt-2 font-semibold ${session.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{session.pnl >= 0 ? '+' : ''}{session.pnl} pts</p>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-amber-500/10">
+                        <div>
+                          <p className="text-xs text-muted-foreground">P&L</p>
+                          <p className={`text-sm font-semibold ${session.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{session.pnl >= 0 ? '+' : ''}${session.pnl}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Avg RR</p>
+                          <p className="text-sm font-semibold text-cyan-400">{session.avgRR ? `1:${Number(session.avgRR) % 1 === 0 ? Math.round(Number(session.avgRR)) : Number(session.avgRR).toFixed(2)}` : '—'}</p>
+                        </div>
                       </div>
                     </div>
                   </Card>
                 </motion.div>
               ))}
+            </div>
 
-              {/* Session detail modal */}
-              <Dialog open={sessionModalOpen} onOpenChange={(val) => { setSessionModalOpen(val); if (!val) setSelectedSession(null) }}>
+            {/* Mobile scrollable version */}
+            <div className="lg:hidden flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide">
+              {sessionData.map((session, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 8 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  className="flex-shrink-0 w-80 snap-start"
+                >
+                  <Card
+                    onClick={() => { setSelectedSession(session); setSessionModalOpen(true) }}
+                    className="p-4 cursor-pointer hover:shadow-2xl transition-shadow border border-amber-500/10 bg-amber-500/5 h-full"
+                  >
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">{session.name}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{session.trades} trades</p>
+                        </div>
+                        <Badge className={`${session.winrate > 55 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'} border-0`}>{session.winrate.toFixed(1)}%</Badge>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-amber-500/10">
+                        <div>
+                          <p className="text-xs text-muted-foreground">P&L</p>
+                          <p className={`text-sm font-semibold ${session.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{session.pnl >= 0 ? '+' : ''}${session.pnl}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Avg RR</p>
+                          <p className="text-sm font-semibold text-cyan-400">{session.avgRR ? `1:${Number(session.avgRR) % 1 === 0 ? Math.round(Number(session.avgRR)) : Number(session.avgRR).toFixed(2)}` : '—'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Session detail modal */}
+            <Dialog open={sessionModalOpen} onOpenChange={(val) => { setSessionModalOpen(val); if (!val) setSelectedSession(null) }}>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>{selectedSession?.name || 'Session'}</DialogTitle>
                     <DialogDescription>
-                      {selectedSession ? `${selectedSession.trades} trades • Win ${selectedSession.winrate?.toFixed(1)}% • ${selectedSession.pnl >= 0 ? '+' : ''}${selectedSession.pnl} pts` : ''}
+                      {selectedSession ? `${selectedSession.trades} trades • Win ${selectedSession.winrate?.toFixed(1)}% • ${selectedSession.pnl >= 0 ? '+' : ''}$${selectedSession.pnl}` : ''}
                     </DialogDescription>
                   </DialogHeader>
 
@@ -684,14 +879,31 @@ const Performance = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {entries.filter((e:any) => ((e.session || '—').toString() === (selectedSession?.name || '—'))).map((e:any, idx:number) => (
-                            <tr key={idx} className="border-b">
-                              <td className="py-2 px-2">{e.entry_at ? new Date(e.entry_at).toLocaleDateString() : new Date(e.created_at).toLocaleDateString()}</td>
-                              <td className="py-2 px-2">{e.symbol || e.instrument || '—'}</td>
-                              <td className={`py-2 px-2 text-right font-semibold ${Number(e.realized_points || e.realized_amount || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{Number(e.realized_points || e.realized_amount || 0) >= 0 ? '+' : ''}{Number(e.realized_points || e.realized_amount || 0)}</td>
-                              <td className="py-2 px-2 text-right">{e.achieved_rr ? `1:${Number(e.achieved_rr).toFixed(2)}` : '—'}</td>
-                            </tr>
-                          ))}
+                          {entries.filter((e:any) => ((e.session || '—').toString() === (selectedSession?.name || '—'))).map((e:any, idx:number) => {
+                            const riskPoints = Number(e.stop_loss_points || 0)
+                            const rewardPoints = Number(e.target_points || 0)
+                            const pnl = Number(e.realized_amount || 0)
+                            
+                            let displayRR = '—'
+                            if (e.result === 'MANUAL' && riskPoints > 0) {
+                              const rrValue = pnl / riskPoints
+                              displayRR = `1:${rrValue % 1 === 0 ? Math.round(rrValue) : rrValue.toFixed(2)}`
+                            } else if (e.result === 'TP' && riskPoints > 0) {
+                              const rrValue = rewardPoints / riskPoints
+                              displayRR = `1:${rrValue % 1 === 0 ? Math.round(rrValue) : rrValue.toFixed(2)}`
+                            } else if (e.result === 'SL') {
+                              displayRR = '1:-1'
+                            }
+                            
+                            return (
+                              <tr key={idx} className="border-b">
+                                <td className="py-2 px-2">{e.entry_at ? new Date(e.entry_at).toLocaleDateString() : new Date(e.created_at).toLocaleDateString()}</td>
+                                <td className="py-2 px-2">{e.symbol || e.instrument || '—'}</td>
+                                <td className={`py-2 px-2 text-right font-semibold ${Number(e.realized_amount || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{Number(e.realized_amount || 0) >= 0 ? '+' : ''}${Number(e.realized_amount || 0)}</td>
+                                <td className="py-2 px-2 text-right text-cyan-400 font-semibold">{displayRR}</td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     ) : (
@@ -704,8 +916,8 @@ const Performance = () => {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-            </div>
-          ) : (
+            </>
+            ) : (
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -725,8 +937,9 @@ const Performance = () => {
           <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full blur-3xl -z-10" />
           
           {symbolStrategyMatrix.length > 0 ? (
-            <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory">
-              {symbolStrategyMatrix.map((row, idx) => (
+            <div className="w-full flex justify-center">
+              <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory items-start">
+                {symbolStrategyMatrix.map((row, idx) => (
                 <motion.div
                   key={idx}
                   initial={{ opacity: 0, y: 8 }}
@@ -750,7 +963,7 @@ const Performance = () => {
                         <div className="flex justify-between text-muted-foreground">
                           <span>Win: {strat.winrate.toFixed(1)}%</span>
                           <span className={strat.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                            {strat.pnl >= 0 ? '+' : ''}{strat.pnl} pts
+                            {strat.pnl >= 0 ? '+' : ''}${strat.pnl}
                           </span>
                         </div>
                       </div>
@@ -765,6 +978,7 @@ const Performance = () => {
                   </button>
                 </motion.div>
               ))}
+            </div>
             </div>
           ) : (
             <motion.div
@@ -816,7 +1030,7 @@ const Performance = () => {
                   whileInView={{ scale: 1 }}
                   className="text-xl sm:text-2xl font-bold text-red-400"
                 >
-                  –{mistake.cost.toFixed(2)} pts
+                  –${mistake.cost.toFixed(2)}
                 </motion.p>
               </motion.div>
             )) : (
@@ -876,7 +1090,7 @@ const Performance = () => {
                     <div className="flex flex-col">
                       <p className="text-xs text-muted-foreground">Net P&L</p>
                       <p className={`text-lg font-bold ${strat.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {strat.pnl >= 0 ? '+' : ''}{strat.pnl} pts
+                        {strat.pnl >= 0 ? '+' : ''}${strat.pnl}
                       </p>
                     </div>
                     <div className="flex flex-col">
@@ -900,7 +1114,7 @@ const Performance = () => {
                   <div className="text-center">
                     <p className="text-xs text-muted-foreground mb-1">Total P&L</p>
                     <p className={`text-2xl font-bold ${selectedSymbolData.strategies.reduce((sum: number, s: any) => sum + s.pnl, 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {selectedSymbolData.strategies.reduce((sum: number, s: any) => sum + s.pnl, 0) >= 0 ? '+' : ''}{selectedSymbolData.strategies.reduce((sum: number, s: any) => sum + s.pnl, 0)} pts
+                      {selectedSymbolData.strategies.reduce((sum: number, s: any) => sum + s.pnl, 0) >= 0 ? '+' : ''}${selectedSymbolData.strategies.reduce((sum: number, s: any) => sum + s.pnl, 0)}
                     </p>
                   </div>
                 </div>

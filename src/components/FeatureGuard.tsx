@@ -30,16 +30,16 @@ const FeatureGuard: React.FC<FeatureGuardProps> = ({ feature, children }) => {
     (feature === 'propfirm' && adminSettings.propfirm_locked) ||
     (feature === 'journal' && adminSettings.journal_locked);
 
-  console.log(`🔍 FeatureGuard check for '${feature}':`, {
-    propfirm_locked: adminSettings.propfirm_locked,
-    journal_locked: adminSettings.journal_locked,
-    isLocked,
-  });
+  //console.log(`🔍 FeatureGuard check for '${feature}':`, {
+    //propfirm_locked: adminSettings.propfirm_locked,
+   // journal_locked: adminSettings.journal_locked,
+   // isLocked,
+  //});
 
   // Check maintenance mode AFTER checking if feature is locked
   // This way, locked features show their lock modal even if maintenance mode is on
   if (adminSettings.maintenance_mode && !isLocked) {
-    console.log('🔒 Maintenance mode is ON (feature is not locked)');
+    //console.log('🔒 Maintenance mode is ON (feature is not locked)');
     return <UnderMaintenance />;
   }
 
@@ -60,7 +60,7 @@ const FeatureGuard: React.FC<FeatureGuardProps> = ({ feature, children }) => {
     const featureTitle = feature === 'propfirm' ? 'PropFirm' : 'Trading Journal';
     const toggleFn = feature === 'propfirm' ? togglePropFirmLock : toggleJournalLock;
 
-    console.log(`🔐 ${feature} is LOCKED with type: ${lockType}`);
+    //console.log(`🔐 ${feature} is LOCKED with type: ${lockType}`);
 
     // When locked, render content blurred with overlay modal on top
     return (

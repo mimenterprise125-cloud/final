@@ -61,7 +61,7 @@ const Signup = () => {
           email: email, 
           password,
           options: {
-            redirectTo: getOAuthRedirectUrl('/dashboard/journal')
+            redirectTo: getOAuthRedirectUrl('/auth/callback')
           }
         })
 
@@ -123,7 +123,7 @@ const Signup = () => {
 
     const { error } = await supabase.auth.signInWithOAuth({ 
       provider: 'google', 
-      options: { redirectTo: getOAuthRedirectUrl('/dashboard/journal') }
+      options: { redirectTo: getOAuthRedirectUrl('/auth/callback') }
     })
     if (error) {
       toast({ title: 'OAuth failed', description: error.message, variant: 'destructive' })

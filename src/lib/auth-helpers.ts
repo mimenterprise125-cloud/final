@@ -1,43 +1,58 @@
 /**
  * Get the correct redirect URL for OAuth callbacks
  * In production, uses the actual domain; in development, can use localhost or a tunneling service
+ * Handles HashRouter by including # in the URL path
  * 
  * Environment variables:
  * - VITE_OAUTH_REDIRECT_DOMAIN: Custom domain (e.g., https://abc123.ngrok.io)
  *   If set, this will ALWAYS be used instead of window.location.origin
  */
-export const getOAuthRedirectUrl = (path: string = '/dashboard'): string => {
+export const getOAuthRedirectUrl = (path: string = '/auth/callback'): string => {
   // Priority 1: Use custom domain if set (ngrok, tunnel, etc.)
   if (import.meta.env.VITE_OAUTH_REDIRECT_DOMAIN) {
     const customDomain = import.meta.env.VITE_OAUTH_REDIRECT_DOMAIN.trim();
     // Remove trailing slash if present
     const cleanDomain = customDomain.endsWith('/') ? customDomain.slice(0, -1) : customDomain;
-    return `${cleanDomain}${path}`;
+    // For HashRouter, include # before the path
+    return `${cleanDomain}/#${path}`;
   }
   
-  // Priority 2: Use window.location.origin (localhost works fine)
-  return `${window.location.origin}${path}`;
+  // Priority 2: Use window.location.origin with # for HashRouter
+  // HashRouter uses URLs like: origin/#/route
+  return `${window.location.origin}/#${path}`;
 };
 
 /**
  * Get all valid OAuth redirect URLs for Supabase Google OAuth configuration
  * This is useful when setting up your Google OAuth credentials
+ * Includes both /auth/callback (Supabase redirect) and dashboard redirect URLs
  */
 export const getOAuthRedirectUrls = (): string[] => {
   const urls = [
-    // Development URLs
-    'http://localhost:3000/dashboard',
-    'http://localhost:5173/dashboard',
-    'http://127.0.0.1:5173/dashboard',
-    'http://127.0.0.1:3000/dashboard',
+    // Development URLs - Auth callback (primary Supabase redirect)
+    'http://localhost:3000/#/auth/callback',
+    'http://localhost:5173/#/auth/callback',
+    'http://127.0.0.1:5173/#/auth/callback',
+    'http://127.0.0.1:3000/#/auth/callback',
+    
+    // Development URLs - Dashboard (secondary redirect after auth)
+    'http://localhost:3000/#/dashboard/journal',
+    'http://localhost:5173/#/dashboard/journal',
+    'http://127.0.0.1:5173/#/dashboard/journal',
+    'http://127.0.0.1:3000/#/dashboard/journal',
     
     // Production - add your actual domain
-    // 'https://yourdomain.com/dashboard',
+    // 'https://yourdomain.com/#/auth/callback',
+    // 'https://yourdomain.com/#/dashboard/journal',
   ];
   
   // Add custom domain if set
   if (import.meta.env.VITE_OAUTH_REDIRECT_DOMAIN) {
-    urls.push(`${import.meta.env.VITE_OAUTH_REDIRECT_DOMAIN}/dashboard`);
+    const cleanDomain = import.meta.env.VITE_OAUTH_REDIRECT_DOMAIN.endsWith('/') 
+      ? import.meta.env.VITE_OAUTH_REDIRECT_DOMAIN.slice(0, -1)
+      : import.meta.env.VITE_OAUTH_REDIRECT_DOMAIN;
+    urls.push(`${cleanDomain}/#/auth/callback`);
+    urls.push(`${cleanDomain}/#/dashboard/journal`);
   }
   
   return urls;

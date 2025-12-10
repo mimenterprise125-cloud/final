@@ -8,6 +8,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { PanelLeft } from "lucide-react";
 import { useAdmin } from '@/lib/AdminContext';
+import Footer from "@/components/Footer";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -103,6 +104,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             {children}
           </div>
         </main>
+
+        {/* Footer */}
+        <Footer />
       </div>
 
       {/* Modals removed from layout — content moved to landing page as transparent cards */}

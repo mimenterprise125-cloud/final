@@ -119,7 +119,9 @@ const TradingJournal = () => {
   }, [user, location.search, search]);
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="flex flex-col min-h-screen">
+        <div className="flex-1 space-y-6 pb-20">
       {/* Header Section - Enhanced */}
       <motion.div 
         className="space-y-4"
@@ -144,7 +146,7 @@ const TradingJournal = () => {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
               >
-                📊 Track and analyze all your trades in one place. Monitor your performance metrics and improve your trading strategy.
+                Track and analyze all your trades in one place. Monitor your performance metrics and improve your trading strategy.
               </motion.p>
             </div>
             <motion.div
@@ -247,22 +249,24 @@ const TradingJournal = () => {
 
       {/* Table Section */}
       <motion.div 
-        className="glass rounded-xl overflow-hidden border border-border/40 -mx-3 sm:mx-0"
+        className="glass rounded-xl overflow-hidden border border-border/40 w-full"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.3 }}
       >
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs sm:text-sm">
+        <div className="w-full overflow-hidden">
+          <table className="w-full text-sm table-fixed">
             <thead>
-              <tr className="text-xs sm:text-sm text-muted-foreground border-b border-border/30 bg-gradient-to-r from-background/60 to-background/40">
-                <th className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-left font-semibold whitespace-nowrap text-xs">Date</th>
-                <th className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-left font-semibold whitespace-nowrap text-xs">Symbol</th>
-                <th className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-left font-semibold whitespace-nowrap text-xs hidden sm:table-cell">Dir</th>
-                <th className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-left font-semibold whitespace-nowrap text-xs hidden md:table-cell">Setup</th>
-                <th className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-left font-semibold hidden lg:table-cell whitespace-nowrap text-xs">Stop/Target</th>
-                <th className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-right font-semibold whitespace-nowrap text-xs">P&L</th>
-                <th className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-right font-semibold whitespace-nowrap text-xs">Actions</th>
+              <tr className="text-xs text-muted-foreground border-b border-border/50 bg-gradient-to-r from-accent/5 to-transparent sticky top-0 z-10">
+                <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-left font-semibold whitespace-nowrap text-xs sm:text-sm">Date</th>
+                <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-left font-semibold whitespace-nowrap text-xs sm:text-sm">Symbol</th>
+                <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-left font-semibold whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm">Direction</th>
+                <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-left font-semibold whitespace-nowrap hidden md:table-cell text-xs sm:text-sm">Setup</th>
+                <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-center font-semibold whitespace-nowrap hidden lg:table-cell text-xs sm:text-sm">Execution</th>
+                <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-center font-semibold whitespace-nowrap hidden lg:table-cell text-xs sm:text-sm">Result</th>
+                <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-center font-semibold whitespace-nowrap hidden lg:table-cell text-xs sm:text-sm">RR</th>
+                <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-center font-semibold whitespace-nowrap text-xs sm:text-sm">P&L</th>
+                <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-center font-semibold whitespace-nowrap text-xs sm:text-sm">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/20">
@@ -275,33 +279,95 @@ const TradingJournal = () => {
                 return pageItems.map((e:any) => {
                   const ts = e.entry_at || e.created_at;
                   const timestamp = ts ? new Date(ts) : null;
-                  const realized = Number(e.realized_amount ?? e.realized_points ?? 0);
+                  const realized = Number(e.realized_amount ?? 0);
                   const isWin = realized > 0;
                   const isLoss = realized < 0;
+                  const direction = e.direction ? (e.direction.toUpperCase() === 'LONG' ? '🟢 LONG' : '🔴 SHORT') : '—';
+                  
+                  // Calculate RR
+                  const riskPoints = Number(e.stop_loss_points || 0);
+                  let rr = 0;
+                  if (e.result === 'TP' && riskPoints > 0) {
+                    rr = (Number(e.target_points || 0)) / riskPoints;
+                  } else if (e.result === 'SL') {
+                    rr = -1;
+                  } else if (e.result === 'MANUAL' && riskPoints > 0) {
+                    rr = realized / riskPoints;
+                  }
+                  const rrDisplay = rr % 1 === 0 ? Math.round(rr) : rr.toFixed(2);
+                  const execution = e.execution_type || '—';
+                  const result = e.result || '—';
+                  
                   return (
                     <motion.tr 
                       key={e.id} 
-                      className="hover:bg-accent/8 transition-colors align-top text-xs sm:text-sm border-opacity-50"
+                      className="hover:bg-accent/10 transition-all duration-150 group"
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 align-top text-muted-foreground font-medium whitespace-nowrap text-xs">{timestamp ? timestamp.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }) : '—'}</td>
-                      <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 font-bold align-top text-foreground text-blue-400 whitespace-nowrap text-xs sm:text-sm">{e.symbol || '—'}</td>
-                      <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 align-top text-muted-foreground hidden sm:table-cell whitespace-nowrap text-xs">{e.direction || '—'}</td>
-                      <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 align-top text-muted-foreground text-xs hidden md:table-cell max-w-[80px] truncate">{Array.isArray(e.setup) ? e.setup.join(', ') : (e.setup || '—')}</td>
-                      <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 align-top text-muted-foreground hidden lg:table-cell text-xs whitespace-nowrap">{(e.stop_loss_points || e.stop_loss_price) ? `${e.stop_loss_points || e.stop_loss_price} / ${e.target_points || e.target_price || '—'}` : '—'}</td>
-                      <td className={`py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-right align-top font-bold text-xs whitespace-nowrap ${isWin ? 'text-emerald-400' : isLoss ? 'text-rose-400' : 'text-muted-foreground'}`}>
-                        {isWin && '💰'} {isLoss && '📉'} <span className="hidden xs:inline">{realized>=0? '+' : ''}{realized.toFixed(2)}</span><span className="xs:hidden">{realized>=0? '+' : ''}{Math.abs(realized).toFixed(0)}</span>
+                      {/* Date */}
+                      <td className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-muted-foreground font-medium whitespace-nowrap text-xs sm:text-sm">
+                        {timestamp ? (
+                          <>
+                            <span className="sm:hidden">{`${String(timestamp.getDate()).padStart(2, '0')}/${String(timestamp.getMonth() + 1).padStart(2, '0')}/${String(timestamp.getFullYear()).slice(-2)}`}</span>
+                            <span className="hidden sm:inline">{timestamp.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: '2-digit' })}</span>
+                          </>
+                        ) : '—'}
                       </td>
-                      <td className="py-2 sm:py-3 md:py-4 px-2 sm:px-3 md:px-4 text-right align-top">
-                        <div className="flex justify-end gap-1 sm:gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => setViewEntry(e)} className="h-6 xs:h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm hover:bg-accent/30 transition-colors">
+                      
+                      {/* Symbol */}
+                      <td className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 font-bold text-blue-400 whitespace-nowrap text-xs sm:text-sm">
+                        {e.symbol || '—'}
+                      </td>
+                      
+                      {/* Direction */}
+                      <td className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-muted-foreground hidden sm:table-cell whitespace-nowrap text-xs">
+                        {direction}
+                      </td>
+                      
+                      {/* Setup */}
+                      <td className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-muted-foreground hidden md:table-cell text-xs">
+                        <div className="truncate max-w-[100px]">
+                          {Array.isArray(e.setup) ? e.setup.join(', ') : (e.setup || '—')}
+                        </div>
+                      </td>
+                      
+                      {/* Execution */}
+                      <td className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-muted-foreground hidden lg:table-cell text-xs font-mono text-center">
+                        {execution}
+                      </td>
+                      
+                      {/* Result */}
+                      <td className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-muted-foreground hidden lg:table-cell text-xs font-mono text-center">
+                        {result}
+                      </td>
+                      
+                      {/* RR */}
+                      <td className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-muted-foreground hidden lg:table-cell text-xs font-mono text-center">
+                        {rr ? `1:${rrDisplay}` : '—'}
+                      </td>
+                      
+                      {/* P&L */}
+                      <td className={`py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-center font-bold text-xs sm:text-sm ${isWin ? 'text-emerald-400 bg-emerald-500/10' : isLoss ? 'text-rose-400 bg-rose-500/10' : 'text-muted-foreground'}`}>
+                        <span>${Math.abs(realized).toFixed(2)}</span>
+                      </td>
+                      
+                      {/* Actions */}
+                      <td className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-center">
+                        <div className="flex flex-col sm:flex-row gap-1 sm:gap-1.5 justify-center items-center opacity-100 transition-opacity duration-150 action-buttons">
+                          <button 
+                            onClick={() => setViewEntry(e)}
+                            className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md text-xs font-medium bg-accent/20 hover:bg-accent/40 text-accent transition-all duration-150 whitespace-nowrap text-center w-full sm:w-auto"
+                          >
                             View
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setEditEntry(e)} className="h-6 xs:h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm hover:bg-blue-500/20 hover:text-blue-400 transition-colors">
+                          </button>
+                          <button 
+                            onClick={() => setEditEntry(e)}
+                            className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md text-xs font-medium bg-blue-500/20 hover:bg-blue-500/40 text-blue-400 transition-all duration-150 text-center w-full sm:w-auto"
+                          >
                             Edit
-                          </Button>
+                          </button>
                         </div>
                       </td>
                     </motion.tr>
@@ -313,33 +379,33 @@ const TradingJournal = () => {
         </div>
       </motion.div>
 
-      {/* Pagination Controls - Sticky at Bottom */}
+      {/* Pagination Controls */}
       {(() => {
         const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
         const safePage = Math.min(page, totalPages);
         
         return (
-            <motion.div 
-            className="sticky bottom-0 left-0 right-0 p-3 sm:p-4 bg-gradient-to-t from-background via-background/95 to-background/80 backdrop-blur border-t border-border/40 z-30 rounded-b-xl"
+          <motion.div 
+            className="p-2 xs:p-3 sm:p-4 bg-gradient-to-t from-background via-background/95 to-background/80 backdrop-blur border-t border-border/40 mt-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.3 }}
           >
-            <div className="flex flex-col xs:flex-row items-center justify-between gap-3 xs:gap-4">
-              <div className="text-xs xs:text-sm text-muted-foreground font-medium text-center xs:text-left">
+            <div className="flex flex-col xs:flex-row items-center justify-between gap-2 xs:gap-3 sm:gap-4">
+              <div className="text-xxs xs:text-xs sm:text-sm text-muted-foreground font-medium text-center xs:text-left">
                 <span className="text-foreground font-bold">{entries.length}</span> total • Page <span className="font-bold text-accent">{safePage}</span>/<span className="font-bold text-accent">{totalPages}</span>
               </div>
-              <div className="flex gap-1 xs:gap-2 items-center">
+              <div className="flex gap-0.5 xs:gap-1 sm:gap-2 items-center">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={()=> setPage(p => Math.max(1, p-1))}
                   disabled={safePage === 1}
-                  className="hover:bg-accent/20 hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs xs:text-sm px-2 xs:px-3 py-1 xs:py-2 h-7 xs:h-9"
+                  className="hover:bg-accent/20 hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xxs xs:text-xs sm:text-sm px-1.5 xs:px-2 sm:px-3 py-0.5 xs:py-1 sm:py-2 h-6 xs:h-7 sm:h-9"
                 >
                   ← Prev
                 </Button>
-                <div className="px-2 xs:px-3 py-1 xs:py-1.5 rounded-lg bg-background border border-border/50 text-xs xs:text-sm font-semibold text-foreground min-w-[35px] xs:min-w-[45px] text-center">
+                <div className="px-1.5 xs:px-2 sm:px-3 py-0.5 xs:py-1 sm:py-1.5 rounded-lg bg-background border border-border/50 text-xxs xs:text-xs sm:text-sm font-semibold text-foreground min-w-[28px] xs:min-w-[32px] sm:min-w-[45px] text-center">
                   {safePage}
                 </div>
                 <Button 
@@ -347,7 +413,7 @@ const TradingJournal = () => {
                   size="sm"
                   onClick={()=> setPage(p => (p < totalPages ? p + 1 : p))}
                   disabled={safePage >= totalPages}
-                  className="hover:bg-accent/20 hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs xs:text-sm px-2 xs:px-3 py-1 xs:py-2 h-7 xs:h-9"
+                  className="hover:bg-accent/20 hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xxs xs:text-xs sm:text-sm px-1.5 xs:px-2 sm:px-3 py-0.5 xs:py-1 sm:py-2 h-6 xs:h-7 sm:h-9"
                 >
                   Next →
                 </Button>
@@ -427,7 +493,9 @@ const TradingJournal = () => {
       <EditJournalDialog open={!!editEntry} entry={editEntry} onOpenChange={(open) => { if (!open) setEditEntry(null) }} />
 
       <ViewJournalDialog open={!!viewEntry} entry={viewEntry} onOpenChange={(open) => { if (!open) setViewEntry(null) }} />
-    </div>
+      </div>
+      </div>
+    </>
   );
 };
 
@@ -439,11 +507,11 @@ function MonthlyView({ entries }: { entries: any[] }){
   const wins = list.filter((t:any)=> t.win).length
   const losses = total - wins
   const winRate = total>0 ? Math.round((wins/total)*100) : 0
-  const avgReward = list.filter((t:any)=> t.realized_points>0).reduce((s:any,t:any)=> s + Number(t.realized_points||0),0) / Math.max(1, list.filter((t:any)=> t.realized_points>0).length)
-  const avgLoss = list.filter((t:any)=> t.realized_points<0).reduce((s:any,t:any)=> s + Math.abs(Number(t.realized_points||0)),0) / Math.max(1, list.filter((t:any)=> t.realized_points<0).length)
-  const best = list.reduce((best:any,cur:any)=>(!best|| cur.realized_points>best.realized_points)?cur:best, null)
-  const worst = list.reduce((worst:any,cur:any)=>(!worst|| cur.realized_points<worst.realized_points)?cur:worst, null)
-  const totalRealized = list.reduce((s:any,t:any)=> s + Number(t.realized_points||0),0)
+  const avgReward = list.filter((t:any)=> t.realized_amount>0).reduce((s:any,t:any)=> s + Number(t.realized_amount||0),0) / Math.max(1, list.filter((t:any)=> t.realized_amount>0).length)
+  const avgLoss = list.filter((t:any)=> t.realized_amount<0).reduce((s:any,t:any)=> s + Math.abs(Number(t.realized_amount||0)),0) / Math.max(1, list.filter((t:any)=> t.realized_amount<0).length)
+  const best = list.reduce((best:any,cur:any)=>(!best|| cur.realized_amount>best.realized_amount)?cur:best, null)
+  const worst = list.reduce((worst:any,cur:any)=>(!worst|| cur.realized_amount<worst.realized_amount)?cur:worst, null)
+  const totalRealized = list.reduce((s:any,t:any)=> s + Number(t.realized_amount||0),0)
 
   return (
     <div>
@@ -474,23 +542,23 @@ function MonthlyView({ entries }: { entries: any[] }){
         </Card>
         <Card className="p-3 sm:p-4">
           <div className="text-xs sm:text-sm text-muted-foreground">Avg reward</div>
-          <div className="text-xl sm:text-2xl font-bold mt-1">{isNaN(avgReward) ? '-' : avgReward.toFixed(1)}</div>
+          <div className="text-xl sm:text-2xl font-bold mt-1">${isNaN(avgReward) ? '-' : avgReward.toFixed(2)}</div>
         </Card>
         <Card className="p-3 sm:p-4">
           <div className="text-xs sm:text-sm text-muted-foreground">Avg loss</div>
-          <div className="text-xl sm:text-2xl font-bold mt-1">{isNaN(avgLoss) ? '-' : avgLoss.toFixed(1)}</div>
+          <div className="text-xl sm:text-2xl font-bold mt-1">${isNaN(avgLoss) ? '-' : avgLoss.toFixed(2)}</div>
         </Card>
         <Card className="p-3 sm:p-4 xs:col-span-2 md:col-span-2">
           <div className="text-xs sm:text-sm text-muted-foreground">Best trade</div>
-          <div className="text-base sm:text-lg font-bold mt-1">{best ? `${best.symbol} ${best.realized_points} pts` : '-'}</div>
+          <div className="text-base sm:text-lg font-bold mt-1">{best ? `${best.symbol} $${best.realized_amount}` : '-'}</div>
         </Card>
         <Card className="p-3 sm:p-4">
           <div className="text-xs sm:text-sm text-muted-foreground">Worst trade</div>
-          <div className="text-base sm:text-lg font-bold mt-1">{worst ? `${worst.symbol} ${worst.realized_points} pts` : '-'}</div>
+          <div className="text-base sm:text-lg font-bold mt-1">{worst ? `${worst.symbol} $${worst.realized_amount}` : '-'}</div>
         </Card>
         <Card className="p-3 sm:p-4 xs:col-span-2 md:col-span-3">
-          <div className="text-xs sm:text-sm text-muted-foreground">Total realized points</div>
-          <div className="text-xl sm:text-2xl font-bold mt-1">{totalRealized}</div>
+          <div className="text-xs sm:text-sm text-muted-foreground">Total realized</div>
+          <div className="text-xl sm:text-2xl font-bold mt-1">${totalRealized}</div>
         </Card>
       </div>
     </div>
@@ -511,17 +579,37 @@ function WeeklyView({ entries }: { entries: any[] }){
       const d = new Date(t.executed_at)
       return d >= start && d <= end
     })
-    const total = list.reduce((s:any,t:any)=> s + Number(t.realized_points||0),0)
+    const total = list.reduce((s:any,t:any)=> s + Number(t.realized_amount||0),0)
     const wins = list.filter((t:any)=> t.win).length
     weeks.push({ range: `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`, trades: list, total, wins })
   }
 
   // top/worst pairs
-  const pairAgg = entries.reduce((acc:any, t:any)=>{ const s = t.symbol||'N/A'; acc[s] = acc[s]||0; acc[s]+= Number(t.realized_points||0); return acc }, {})
+  const pairAgg = entries.reduce((acc:any, t:any)=>{ const s = t.symbol||'N/A'; acc[s] = acc[s]||0; acc[s]+= Number(t.realized_amount||0); return acc }, {})
   const pairs = Object.entries(pairAgg).map(([k,v])=>({pair:k, total:v})).sort((a:any,b:any)=> b.total - a.total)
 
-  // avg RRR = average of (target/stop) across trades with stop>0
-  const rr = entries.filter((t:any)=> t.stop_loss_points>0).map((t:any)=> Number(t.target_points || 0)/Number(t.stop_loss_points||1))
+  // avg RRR = average of (target_points) / (stop_loss_points) across trades
+  // Considers manual exits with realized_amount as the achieved profit/loss
+  const rr = entries.filter((t:any)=> t.stop_loss_points && t.stop_loss_points > 0).map((t:any)=> {
+    const riskPoints = Number(t.stop_loss_points || 0)
+    const rewardPoints = Number(t.target_points || 0)
+    const realizedAmount = Number(t.realized_amount || 0)
+    
+    // Planned RR
+    let targetRR = riskPoints > 0 ? rewardPoints / riskPoints : 0
+    
+    // Achieved RR: for manual exits use realized_amount, for others use result
+    let achievedRR = targetRR
+    if (t.result === 'MANUAL' && riskPoints > 0) {
+      achievedRR = realizedAmount / riskPoints
+    } else if (t.result === 'TP') {
+      achievedRR = rewardPoints / riskPoints
+    } else if (t.result === 'SL') {
+      achievedRR = -1  // -1 RR when stopped out
+    }
+    
+    return achievedRR
+  })
   const avgRRR = rr.length? (rr.reduce((s:any,x:any)=>s+x,0)/rr.length): 0
   const avgDuration = entries.length? (entries.reduce((s:any,t:any)=> s + Number(t.duration_minutes||0),0)/entries.length) : 0
 

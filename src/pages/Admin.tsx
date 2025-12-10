@@ -7,6 +7,7 @@ import { useAdmin } from '@/lib/AdminContext';
 import { useAuth } from '@/lib/AuthProvider';
 import { motion } from 'framer-motion';
 import { PricingManagementTab } from '@/components/PricingManagementTab';
+import Footer from '@/components/Footer';
 import {
   AlertCircle,
   Users,
@@ -814,10 +815,7 @@ const Admin = () => {
                 </div>
 
                 <Button
-                  onClick={() => {
-                    console.log('🔘 Maintenance Mode button clicked!');
-                    toggleMaintenanceMode();
-                  }}
+                  onClick={() => toggleMaintenanceMode()}
                   size="lg"
                   className={`${
                     adminSettings.maintenance_mode
@@ -848,6 +846,9 @@ const Admin = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

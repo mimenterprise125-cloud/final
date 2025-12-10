@@ -33,14 +33,19 @@ export function AuthCallback() {
 
         if (data.session) {
           // ✅ Session established successfully
+          // For HashRouter, navigate() automatically handles the # prefix
           navigate('/dashboard/journal', { replace: true });
         } else {
-          // ⚠️ No session found
+          // ⚠️ No session found - redirect back to login
+          // User probably closed the OAuth window or something went wrong
+          console.warn('No session found after OAuth callback');
           navigate('/login', { replace: true });
         }
       } catch (err) {
         // ❌ Error during authentication
-        setError(err instanceof Error ? err.message : 'Authentication failed');
+        const errorMsg = err instanceof Error ? err.message : 'Authentication failed';
+        console.error('OAuth callback error:', errorMsg);
+        setError(errorMsg);
         
         // Redirect to login after showing error
         setTimeout(() => navigate('/login', { replace: true }), 3000);
@@ -49,7 +54,9 @@ export function AuthCallback() {
       }
     };
 
-    handleCallback();
+    // Give Supabase a moment to process the callback URL
+    const timer = setTimeout(handleCallback, 100);
+    return () => clearTimeout(timer);
   }, [navigate]);
 
   if (loading) {

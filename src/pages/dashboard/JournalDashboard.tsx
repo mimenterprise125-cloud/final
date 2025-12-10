@@ -51,7 +51,7 @@ function CalendarView({ entries, onOpenEntry }: CalendarViewProps) {
   for (let d = 1; d <= daysInMonth; d++) {
     const key = new Date(year, month, d).toISOString().slice(0, 10);
     const list = mapByDate.get(key) ?? [];
-    const total = list.reduce((s: any, t: any) => s + Number(t.realized_amount ?? t.realized_points ?? 0), 0);
+    const total = list.reduce((s: any, t: any) => s + Number(t.realized_amount ?? 0), 0);
     cells.push({ date: key, trades: list, total });
   }
 
@@ -128,8 +128,8 @@ function CalendarView({ entries, onOpenEntry }: CalendarViewProps) {
                       {t.symbol} • {t.setup}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {t.direction} • {(t.realized_amount ?? t.realized_points) >= 0 ? '+' : ''}$
-                      {Number(t.realized_amount ?? t.realized_points ?? 0).toFixed(2)}
+                      {t.direction} • {(t.realized_amount) >= 0 ? '+' : ''}$
+                      {Number(t.realized_amount ?? 0).toFixed(2)}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -196,7 +196,7 @@ function MonthlyView({
   for (let d = 1; d <= daysInMonth; d++) {
     const key = new Date(year, m, d).toISOString().slice(0, 10);
     const list = mapByDate.get(key) ?? [];
-    const total = list.reduce((s: any, t: any) => s + Number(t.realized_amount ?? t.realized_points ?? 0), 0);
+    const total = list.reduce((s: any, t: any) => s + Number(t.realized_amount ?? 0), 0);
     curWeek.push({ date: key, trades: list, total });
     if (curWeek.length === 7) {
       weeks.push(curWeek);
@@ -218,7 +218,7 @@ function MonthlyView({
     [entries, selMonth]
   );
   const totalTrades = list.length;
-  const totalPnl = list.reduce((s: any, t: any) => s + Number(t.realized_amount ?? t.realized_points ?? 0), 0);
+  const totalPnl = list.reduce((s: any, t: any) => s + Number(t.realized_amount ?? 0), 0);
 
   return (
     <div>
@@ -364,7 +364,7 @@ function YearlyView({
       const d = new Date(ts);
       if (d.getFullYear() !== year) continue;
       const m = d.getMonth();
-      agg[m] = (agg[m] || 0) + Number(e.realized_amount ?? e.realized_points ?? 0);
+      agg[m] = (agg[m] || 0) + Number(e.realized_amount ?? 0);
     }
     return agg;
   }, [entries, year]);
@@ -455,8 +455,14 @@ const JournalDashboard: React.FC = () => {
 
     const fetchJ = async () => {
       try {
-        const userId = user?.id ?? null;
-        const { data, error } = await supabase.from('journals').select('*');
+        // CRITICAL: Filter by user_id to ensure data isolation
+        // RLS policies should handle this, but we also filter here for safety
+        const { data, error } = await supabase
+          .from('journals')
+          .select('*')
+          .eq('user_id', user?.id)  // ← ADDED: Filter by current user only
+          .order('created_at', { ascending: false });
+        
         if (error) {
           console.error('Failed to fetch journals', error);
           return [];
@@ -652,9 +658,9 @@ const JournalDashboard: React.FC = () => {
               <div className="font-bold text-rose-400 text-xs sm:text-sm truncate">{entries.filter(e => !e.win).length}</div>
             </div>
             <div className="p-1 xs:p-1.5 sm:p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 overflow-hidden">
-              <div className="text-muted-foreground mb-0.5 sm:mb-1 text-xs truncate">Win %</div>
+              <div className="text-muted-foreground mb-0.5 sm:mb-1 text-xs truncate">Breakeven</div>
               <div className="font-bold text-blue-400 text-xs sm:text-sm truncate">
-                {entries.length > 0 ? ((entries.filter(e => e.win).length / entries.length) * 100).toFixed(0) : 0}%
+                {entries.filter(e => Math.abs(Number(e.realized_amount || 0)) < 0.01).length}
               </div>
             </div>
           </div>
@@ -668,13 +674,13 @@ const JournalDashboard: React.FC = () => {
           <div
             className={`text-2xl sm:text-3xl font-bold ${
               (() => {
-                const total = entries.reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0);
+                const total = entries.reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0);
                 return total >= 0 ? 'text-emerald-400' : 'text-rose-400';
               })()
             }`}
           >
             {(() => {
-              const total = entries.reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0);
+              const total = entries.reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0);
               return (total >= 0 ? '+' : '') + total.toFixed(2);
             })()}
           </div>
@@ -682,7 +688,7 @@ const JournalDashboard: React.FC = () => {
             <div className="p-1 xs:p-1.5 sm:p-2 rounded-lg bg-background/50 border border-border/30 overflow-hidden">
               <div className="text-muted-foreground mb-0.5 sm:mb-1 text-xs truncate">Per Trade</div>
               <div className="font-bold text-cyan-400 text-xs sm:text-sm truncate">
-                ${entries.length > 0 ? (entries.reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0) / entries.length).toFixed(2) : 0}
+                ${entries.length > 0 ? (entries.reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0) / entries.length).toFixed(2) : 0}
               </div>
             </div>
             <div className="p-1 xs:p-1.5 sm:p-2 rounded-lg bg-background/50 border border-border/30 overflow-hidden">
@@ -702,9 +708,9 @@ const JournalDashboard: React.FC = () => {
               <div className="text-xs text-muted-foreground mb-0.5 sm:mb-1">Avg Win</div>
               <div className="text-lg sm:text-2xl font-bold text-emerald-400">
                 ${(() => {
-                  const wins = entries.filter(e => Number(e.realized_amount ?? e.realized_points ?? 0) > 0);
+                  const wins = entries.filter(e => Number(e.realized_amount ?? 0) > 0);
                   return wins.length > 0 
-                    ? (wins.reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0) / wins.length).toFixed(2)
+                    ? (wins.reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0) / wins.length).toFixed(2)
                     : '0.00';
                 })()}
               </div>
@@ -713,9 +719,9 @@ const JournalDashboard: React.FC = () => {
               <div className="text-xs text-muted-foreground mb-0.5 sm:mb-1">Avg Loss</div>
               <div className="text-lg sm:text-2xl font-bold text-rose-400">
                 ${(() => {
-                  const losses = entries.filter(e => Number(e.realized_amount ?? e.realized_points ?? 0) < 0);
+                  const losses = entries.filter(e => Number(e.realized_amount ?? 0) < 0);
                   return losses.length > 0 
-                    ? (losses.reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0) / losses.length).toFixed(2)
+                    ? (losses.reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0) / losses.length).toFixed(2)
                     : '0.00';
                 })()}
               </div>
@@ -730,11 +736,11 @@ const JournalDashboard: React.FC = () => {
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-yellow-400">
             {(() => {
-              const totalWins = entries.filter(e => Number(e.realized_amount ?? e.realized_points ?? 0) > 0)
-                .reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0);
-              const totalLosses = Math.abs(entries.filter(e => Number(e.realized_amount ?? e.realized_points ?? 0) < 0)
-                .reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0));
-              const pf = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : '∞';
+              const totalWins = entries.filter(e => Number(e.realized_amount ?? 0) > 0)
+                .reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0);
+              const totalLosses = Math.abs(entries.filter(e => Number(e.realized_amount ?? 0) < 0)
+                .reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0));
+              const pf = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : 'N/A';
               return pf;
             })()}
           </div>
@@ -743,10 +749,10 @@ const JournalDashboard: React.FC = () => {
               <div className="text-xs">Wins ÷ Losses</div>
               <div className="text-xs text-muted-foreground mt-1">
                 {(() => {
-                  const totalWins = entries.filter(e => Number(e.realized_amount ?? e.realized_points ?? 0) > 0)
-                    .reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0);
-                  const totalLosses = Math.abs(entries.filter(e => Number(e.realized_amount ?? e.realized_points ?? 0) < 0)
-                    .reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0));
+                  const totalWins = entries.filter(e => Number(e.realized_amount ?? 0) > 0)
+                    .reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0);
+                  const totalLosses = Math.abs(entries.filter(e => Number(e.realized_amount ?? 0) < 0)
+                    .reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0));
                   return `$${totalWins.toFixed(0)} ÷ $${totalLosses.toFixed(0)}`;
                 })()}
               </div>
@@ -767,7 +773,7 @@ const JournalDashboard: React.FC = () => {
               <div className="text-xs text-muted-foreground mb-0.5 sm:mb-1">Best Trade</div>
               <div className="text-lg sm:text-2xl font-bold text-emerald-400">
                 ${(() => {
-                  const best = Math.max(...entries.map((e: any) => Number(e.realized_amount ?? e.realized_points ?? 0)));
+                  const best = Math.max(...entries.map((e: any) => Number(e.realized_amount ?? 0)));
                   return best === -Infinity ? '0.00' : best.toFixed(2);
                 })()}
               </div>
@@ -776,7 +782,9 @@ const JournalDashboard: React.FC = () => {
               <div className="text-xs text-muted-foreground mb-0.5 sm:mb-1">Worst Trade</div>
               <div className="text-lg sm:text-2xl font-bold text-rose-400">
                 ${(() => {
-                  const worst = Math.min(...entries.map((e: any) => Number(e.realized_amount ?? e.realized_points ?? 0)));
+                  const losses = entries.filter((e: any) => Number(e.realized_amount ?? 0) < 0);
+                  if (losses.length === 0) return '0.00';
+                  const worst = Math.min(...losses.map((e: any) => Number(e.realized_amount ?? 0)));
                   return worst === Infinity ? '0.00' : worst.toFixed(2);
                 })()}
               </div>
@@ -796,7 +804,7 @@ const JournalDashboard: React.FC = () => {
                 {(() => {
                   const m = new Date().toISOString().slice(0, 7);
                   const list = entries.filter(e => e.executed_at && e.executed_at.startsWith(m));
-                  return '$' + list.reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0).toFixed(2);
+                  return '$' + list.reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0).toFixed(2);
                 })()}
               </div>
             </div>
@@ -811,7 +819,7 @@ const JournalDashboard: React.FC = () => {
                     const d = new Date(e.executed_at);
                     return d >= lastWeekStart;
                   });
-                  return '$' + list.reduce((s: any, e: any) => s + Number(e.realized_amount ?? e.realized_points ?? 0), 0).toFixed(2);
+                  return '$' + list.reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0).toFixed(2);
                 })()}
               </div>
             </div>
@@ -844,7 +852,7 @@ const JournalDashboard: React.FC = () => {
                 const ts = e.entry_at || e.created_at || e.executed_at;
                 if (!ts) continue;
                 const key = new Date(ts).toISOString().slice(0, 10);
-                map[key] = (map[key] || 0) + Number(e.realized_points || e.realized_amount || 0);
+                map[key] = (map[key] || 0) + Number(e.realized_amount || 0);
               }
               const days = Object.keys(map).sort();
               let cum = 0;
