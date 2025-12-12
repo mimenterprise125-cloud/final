@@ -22,6 +22,7 @@ const Signup = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const { toast } = useToast();
 
@@ -89,6 +90,7 @@ const Signup = () => {
           })
           // Don't navigate - let user see the message and check email
           setFormData({ fullName: '', email: '', password: '', confirmPassword: '' })
+          setEmailSent(true)
           return
         }
 
@@ -259,9 +261,16 @@ const Signup = () => {
               Create Account
             </Button>
 
-            <Button type="button" className="w-full mt-2" variant="ghost" onClick={handleGoogle}>
-              Sign up with Google
-            </Button>
+            {emailSent && (
+              <div className="w-full mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                <p className="text-sm text-blue-300 text-center font-semibold">
+                  ✉️ Please verify your email
+                </p>
+                <p className="text-xs text-blue-300/80 text-center mt-1">
+                  Check your spam folder if you don't see the verification email
+                </p>
+              </div>
+            )}
           </form>
         </Card>
 

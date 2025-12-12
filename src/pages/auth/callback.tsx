@@ -55,7 +55,8 @@ export function AuthCallback() {
     };
 
     // Give Supabase a moment to process the callback URL
-    const timer = setTimeout(handleCallback, 100);
+    // Increased from 100ms to 500ms to ensure session is established
+    const timer = setTimeout(handleCallback, 500);
     return () => clearTimeout(timer);
   }, [navigate]);
 

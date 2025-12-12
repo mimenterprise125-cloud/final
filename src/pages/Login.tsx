@@ -162,10 +162,6 @@ const Login = () => {
             <Button type="submit" className="w-full" size="lg">
               Sign In
             </Button>
-
-            <Button type="button" className="w-full mt-2" variant="ghost" onClick={handleGoogle}>
-              Sign in with Google
-            </Button>
           </form>
 
           <div className="mt-6 text-center">
