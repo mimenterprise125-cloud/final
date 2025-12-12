@@ -35,12 +35,39 @@ const TRADING_SESSIONS = [
   { name: 'Asian Hours', range: '20:00-07:00', hours: [20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6] },
 ];
 
-export const WeekdayAnalysisSection = ({ trades }: TradeData) => {
+interface WeekdayAnalysisProps extends TradeData {
+  accountSize?: number | string;
+  dailyLossLimit?: number | string;
+  maxDD?: number | string;
+  selectedSetup?: string;
+  targetProfit?: number | string;
+  availableSetups?: string[];
+}
+
+export const WeekdayAnalysisSection = ({ 
+  trades,
+  accountSize: initialAccountSize = '',
+  dailyLossLimit: initialDailyLossLimit = '',
+  maxDD: initialMaxDD = '',
+  selectedSetup: initialSelectedSetup = '',
+  targetProfit: initialTargetProfit = '',
+  availableSetups: initialAvailableSetups = []
+}: WeekdayAnalysisProps) => {
   const [selectedDays, setSelectedDays] = useState<boolean[]>([true, true, true, true, true, false, false]);
   const [selectedSessionName, setSelectedSessionName] = useState<string | null>(null);
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
   const [selectedFilterSession, setSelectedFilterSession] = useState<string>('All Sessions');
   const [selectedFilterSymbol, setSelectedFilterSymbol] = useState<string | null>(null);
+  
+  // Funded Account Calculator States
+  const [accountSize, setAccountSize] = useState<number | string>(initialAccountSize);
+  const [dailyLossLimit, setDailyLossLimit] = useState<number | string>(initialDailyLossLimit || 5);
+  const [maxDD, setMaxDD] = useState<number | string>(initialMaxDD || 10);
+  const [selectedSetup, setSelectedSetup] = useState<string>(initialSelectedSetup);
+  const [targetProfit, setTargetProfit] = useState<number | string>(initialTargetProfit || 10);
+  const [availableSetups, setAvailableSetups] = useState<string[]>(initialAvailableSetups);
+  const [riskPerTradeInput, setRiskPerTradeInput] = useState<number | string>(1); // Default 1%
+  const [calculatorSessionFilter, setCalculatorSessionFilter] = useState<string>('All Sessions'); // Session filter for calculator
 
   const getDayOfWeek = (dateString: string) => {
     const date = new Date(dateString);
@@ -57,6 +84,30 @@ export const WeekdayAnalysisSection = ({ trades }: TradeData) => {
       return selectedDays[dayIndex];
     });
   }, [trades, selectedDays]);
+
+  // Extract unique setups from trades
+  const uniqueSetups = useMemo(() => {
+    const setups = new Set<string>();
+    trades.forEach(trade => {
+      if (trade.setup) {
+        setups.add(trade.setup);
+      }
+    });
+    return Array.from(setups).sort();
+  }, [trades]);
+
+  // Get available sessions for the selected setup
+  const availableSessionsForSetup = useMemo(() => {
+    if (!selectedSetup) return [];
+    
+    const sessions = new Set<string>();
+    selectedTrades.forEach(trade => {
+      if (trade.setup === selectedSetup && trade.session) {
+        sessions.add(trade.session);
+      }
+    });
+    return Array.from(sessions).sort();
+  }, [selectedTrades, selectedSetup]);
 
   const metrics = useMemo(() => {
     if (selectedTrades.length === 0) {
@@ -294,52 +345,443 @@ export const WeekdayAnalysisSection = ({ trades }: TradeData) => {
         <Card className="p-6 text-center text-muted-foreground"><p>No trades on selected days</p></Card>
       ) : (
         <div className="space-y-6">
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="p-4 border border-cyan-500/30 bg-cyan-500/5"><p className="text-xs text-muted-foreground mb-2">Total Trades</p><p className="text-3xl font-bold text-cyan-400">{metrics.totalTrades}</p></Card>
-            <Card className="p-4 border border-indigo-500/30 bg-indigo-500/5"><p className="text-xs text-muted-foreground mb-2">Win Rate</p><p className="text-3xl font-bold text-indigo-400">{metrics.winRate.toFixed(1)}%</p></Card>
-            <Card className={`p-4 border ${metrics.netPnL >= 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-rose-500/30 bg-rose-500/5'}`}><p className="text-xs text-muted-foreground mb-2">Net P&L</p><p className={`text-3xl font-bold ${metrics.netPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{metrics.netPnL >= 0 ? '+' : ''}${metrics.netPnL.toFixed(2)}</p></Card>
-            <Card className="p-4 border border-orange-500/30 bg-orange-500/5"><p className="text-xs text-muted-foreground mb-2">Avg RRR</p><p className="text-3xl font-bold text-orange-400">1:{metrics.avgRRR.toFixed(2)}</p></Card>
+
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* SECTION 1: FUNDED ACCOUNT RISK CALCULATOR */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+
+          <div className="pt-6 pb-4">
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <div className="h-px flex-1 bg-gradient-to-r from-amber-500/50 to-transparent"></div>
+               Funded Account Risk Calculator
+              <div className="h-px flex-1 bg-gradient-to-l from-amber-500/50 to-transparent"></div>
+            </h2>
           </div>
 
-          {/* Avg Win/Loss */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="p-4 border border-emerald-500/30 bg-emerald-500/5"><p className="text-xs text-muted-foreground mb-2">Avg Win</p><p className="text-2xl font-bold text-emerald-400">+${metrics.avgWin.toFixed(2)}</p></Card>
-            <Card className="p-4 border border-rose-500/30 bg-rose-500/5"><p className="text-xs text-muted-foreground mb-2">Avg Loss</p><p className="text-2xl font-bold text-rose-400">-${Math.abs(metrics.avgLoss).toFixed(2)}</p></Card>
-          </div>
+          {/* FUNDED ACCOUNT RISK CALCULATOR FORM - COMPACT 2-ROW LAYOUT */}
+          <Card className="p-6 border border-amber-500/30 bg-amber-500/5">
+            <div className="space-y-4">
+              {/* ROW 1: Account, Daily Loss, Max DD, Target Amount (4 columns) */}
+              <div className="grid grid-cols-4 gap-4 w-full">
+                {/* Account Size Input */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Amount ($)</label>
+                  <input
+                    type="text"
+                    value={accountSize ? `$${Number(accountSize).toLocaleString()}` : ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const cleanVal = val.replace(/[$,]/g, '');
+                      if (cleanVal === '' || !isNaN(Number(cleanVal))) {
+                        setAccountSize(cleanVal ? Number(cleanVal) : '');
+                      }
+                    }}
+                    placeholder="$10,000"
+                    list="account-suggestions"
+                    className="w-full px-3 py-2 rounded-lg border border-amber-500/40 bg-background/40 text-foreground placeholder-muted-foreground text-sm text-center focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/50 transition-all hover:border-amber-500/60"
+                  />
+                  <datalist id="account-suggestions">
+                    <option>$5,000</option>
+                    <option>$10,000</option>
+                    <option>$20,000</option>
+                    <option>$25,000</option>
+                    <option>$50,000</option>
+                    <option>$100,000</option>
+                    <option>$150,000</option>
+                    <option>$200,000</option>
+                    <option>$250,000</option>
+                  </datalist>
+                </div>
+                
+                {/* Daily Loss Limit Input */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Daily Loss (%)</label>
+                  <div className="flex gap-2 items-start">
+                    <input
+                      type="number"
+                      value={dailyLossLimit}
+                      onChange={(e) => setDailyLossLimit(e.target.value ? Number(e.target.value) : 5)}
+                      placeholder="5"
+                      className="flex-1 px-3 py-2 rounded-lg border border-emerald-500/40 bg-background/40 text-foreground placeholder-muted-foreground text-sm text-center focus:outline-none focus:border-emerald-500/70 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                    />
+                    {accountSize && (
+                      <div className="px-2 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 whitespace-nowrap flex items-center justify-center min-w-[70px]">
+                        <span className="text-xs font-bold text-emerald-400">
+                          ${(Number(accountSize) * (Number(dailyLossLimit) / 100)).toFixed(0)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Max Drawdown Input */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Max DD (%)</label>
+                  <div className="flex gap-2 items-start">
+                    <input
+                      type="number"
+                      value={maxDD}
+                      onChange={(e) => setMaxDD(e.target.value ? Number(e.target.value) : 10)}
+                      placeholder="10"
+                      className="flex-1 px-3 py-2 rounded-lg border border-rose-500/40 bg-background/40 text-foreground placeholder-muted-foreground text-sm text-center focus:outline-none focus:border-rose-500/70 focus:ring-1 focus:ring-rose-500/50 transition-all"
+                    />
+                    {accountSize && (
+                      <div className="px-2 py-2 rounded-lg border border-rose-500/40 bg-rose-500/10 whitespace-nowrap flex items-center justify-center min-w-[70px]">
+                        <span className="text-xs font-bold text-rose-400">
+                          ${(Number(accountSize) * (Number(maxDD) / 100)).toFixed(0)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-          {/* Best/Worst Days */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="p-4 border border-emerald-500/30 bg-emerald-500/5">
-              <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-4 h-4 text-emerald-400" /><p className="text-xs text-muted-foreground font-semibold">Best Day</p></div>
-              {metrics.bestDay && metrics.bestDay.trades > 0 ? (
-                <>
-                  <p className="text-xl font-bold text-emerald-400">{metrics.bestDay.fullDay}</p>
-                  <p className="text-sm text-emerald-300 mt-1">+${metrics.bestDay.pnl.toFixed(2)}</p>
-                  <p className="text-xs text-emerald-300/70 mt-1">{metrics.bestDay.trades} trades | {metrics.bestDay.winRate.toFixed(1)}% WR</p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">No trades</p>
-              )}
-            </Card>
-            <Card className="p-4 border border-rose-500/30 bg-rose-500/5">
-              <div className="flex items-center gap-2 mb-2"><TrendingDown className="w-4 h-4 text-rose-400" /><p className="text-xs text-muted-foreground font-semibold">Worst Day</p></div>
-              {metrics.worstDay && metrics.worstDay.trades > 0 ? (
-                <>
-                  <p className="text-xl font-bold text-rose-400">{metrics.worstDay.fullDay}</p>
-                  <p className="text-sm text-rose-300 mt-1">{metrics.worstDay.pnl >= 0 ? '+' : ''}${metrics.worstDay.pnl.toFixed(2)}</p>
-                  <p className="text-xs text-rose-300/70 mt-1">{metrics.worstDay.trades} trades | {metrics.worstDay.winRate.toFixed(1)}% WR</p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">No trades</p>
-              )}
-            </Card>
+                {/* Target Profit Input */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Target Profit (%)</label>
+                  <div className="flex gap-2 items-start">
+                    <input
+                      type="number"
+                      value={targetProfit}
+                      onChange={(e) => setTargetProfit(e.target.value ? Number(e.target.value) : 10)}
+                      placeholder="10"
+                      className="flex-1 px-3 py-2 rounded-lg border border-cyan-500/40 bg-background/40 text-foreground placeholder-muted-foreground text-sm text-center focus:outline-none focus:border-cyan-500/70 focus:ring-1 focus:ring-cyan-500/50 transition-all"
+                    />
+                    {accountSize && (
+                      <div className="px-2 py-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 whitespace-nowrap flex items-center justify-center min-w-[70px]">
+                        <span className="text-xs font-bold text-cyan-400">
+                          ${(Number(accountSize) * (Number(targetProfit) / 100)).toFixed(0)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ROW 2: Setup, Risk Per Trade, Session Filter (3 columns) */}
+              <div className="grid grid-cols-3 gap-4 w-full">
+                {/* Setup Selection Dropdown */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Setup</label>
+                  <select
+                    value={selectedSetup}
+                    onChange={(e) => {
+                      setSelectedSetup(e.target.value);
+                      setCalculatorSessionFilter('All Sessions'); // Reset session filter when setup changes
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-amber-500/40 bg-background/40 text-foreground text-sm text-center focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/50 transition-all"
+                  >
+                    <option value="">Select Setup</option>
+                    {uniqueSetups.map((setup) => (
+                      <option key={setup} value={setup}>{setup}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Risk Per Trade (%) Input */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Risk %</label>
+                  <div className="flex gap-2 items-start">
+                    <input
+                      type="number"
+                      value={riskPerTradeInput}
+                      onChange={(e) => setRiskPerTradeInput(e.target.value ? Number(e.target.value) : 1)}
+                      placeholder="1"
+                      min="0.1"
+                      max="10"
+                      step="0.1"
+                      className="flex-1 px-3 py-2 rounded-lg border border-amber-500/40 bg-background/40 text-foreground placeholder-muted-foreground text-sm text-center focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/50 transition-all"
+                    />
+                    {accountSize && (
+                      <div className="px-2 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 whitespace-nowrap flex items-center justify-center min-w-[70px]">
+                        <span className="text-xs font-bold text-amber-400">
+                          ${accountSize ? (Number(accountSize) * ((riskPerTradeInput ? Number(riskPerTradeInput) : 1) / 100)).toFixed(0) : 0}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Session Filter Dropdown */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Session</label>
+                  <select
+                    value={calculatorSessionFilter}
+                    onChange={(e) => setCalculatorSessionFilter(e.target.value)}
+                    disabled={!selectedSetup || availableSessionsForSetup.length === 0}
+                    className="w-full px-3 py-2 rounded-lg border border-cyan-500/40 bg-background/40 text-foreground text-sm text-center focus:outline-none focus:border-cyan-500/70 focus:ring-1 focus:ring-cyan-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="All Sessions">All Sessions</option>
+                    {availableSessionsForSetup.map((session) => (
+                      <option key={session} value={session}>{session}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* FUNDED ACCOUNT RESULTS - Based on Weekday Selection */}
+          {accountSize && dailyLossLimit && maxDD && selectedSetup && targetProfit && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              {(() => {
+                // Filter entries based on selected weekdays AND setup
+                const filteredEntries = selectedTrades;
+                
+                // Get setup stats for win rate - filtered by BOTH setup AND weekday selection
+                const setupData = filteredEntries.filter((e: any) => e.setup === selectedSetup);
+                const setupWins = setupData.filter((e: any) => Number(e.realized_amount || 0) > 0).length;
+                const setupWinRate = setupData.length > 0 ? (setupWins / setupData.length) * 100 : metrics.winRate ?? 50;
+                
+                const accSize = Number(accountSize);
+                const targetProfitPercent = Number(targetProfit);
+                const targetProfitDollars = accSize * (targetProfitPercent / 100);
+                
+                // Risk per trade: use input value if provided, otherwise default to 1% of account
+                const riskPerTrade = riskPerTradeInput 
+                  ? accSize * (Number(riskPerTradeInput) / 100)
+                  : (accSize * 0.01);
+                
+                // Get setup RR from actual trade data (filtered by setup + weekday selection + session)
+                // Use the proper RR calculated from prices/points, not from dollar amounts
+                let setupRelatedTrades = selectedTrades.filter((e: any) => e.setup === selectedSetup);
+                
+                // Also filter by session if one is selected
+                if (calculatorSessionFilter !== 'All Sessions') {
+                  setupRelatedTrades = setupRelatedTrades.filter((e: any) => e.session === calculatorSessionFilter);
+                }
+                
+                // Calculate average RR from the setup trades using the same method as combinedStats
+                let totalSetupRR = 0;
+                let setupTradeCount = 0;
+                
+                setupRelatedTrades.forEach((t: any) => {
+                  const entryPrice = Number(t.entry_price || 0);
+                  const tpPrice = Number(t.target_price || 0);
+                  const slPrice = Number(t.stop_loss_price || 0);
+                  const riskAmount = Number(t.risk_amount || 0);
+                  const realizedAmount = Number(t.realized_amount || 0);
+                  const riskPoints = Number(t.stop_loss_points || 0);
+                  const rewardPoints = Number(t.target_points || 0);
+                  
+                  let tradeRR = 0;
+                  if (entryPrice > 0 && tpPrice > 0 && slPrice > 0) {
+                    // Use pip-aware RR calculation
+                    tradeRR = calculateRRFromPrices(entryPrice, tpPrice, slPrice);
+                  } else if (riskPoints > 0 && rewardPoints > 0) {
+                    // Fallback to points-based calculation
+                    tradeRR = rewardPoints / riskPoints;
+                    tradeRR = Math.min(Math.max(tradeRR, 0), 50);
+                  }
+                  
+                  // Handle manual exits with amount-based RR
+                  if (t.result === 'MANUAL' && riskAmount > 0) {
+                    tradeRR = realizedAmount / riskAmount;
+                    tradeRR = Math.min(Math.max(tradeRR, -10), 50);
+                  }
+                  
+                  totalSetupRR += tradeRR;
+                  setupTradeCount += 1;
+                });
+                
+                const setupRR = setupTradeCount > 0 ? totalSetupRR / setupTradeCount : 1.5;
+                
+                // RESULTS CALCULATIONS - Based on User Inputs Only
+                // Expected profit per trade = (Win Rate % * Risk Per Trade) - ((1 - Win Rate %) * Risk Per Trade)
+                const expectedProfitPerTrade = (setupWinRate / 100) * riskPerTrade - ((1 - setupWinRate / 100) * riskPerTrade);
+                
+                // Calculate trades needed
+                const tradesNeeded = expectedProfitPerTrade > 0 ? Math.ceil(targetProfitDollars / expectedProfitPerTrade) : 0;
+                const expectedWins = Math.ceil(tradesNeeded * (setupWinRate / 100));
+                const expectedLosses = Math.ceil(tradesNeeded * ((100 - setupWinRate) / 100));
+                
+                // Risk Management Calculations
+                const dailyLossAmount = accSize * (Number(dailyLossLimit) / 100);
+                const maxDDAmount = accSize * (Number(maxDD) / 100);
+                
+                const tradesTillDailyLoss = expectedProfitPerTrade !== 0 
+                  ? Math.ceil(dailyLossAmount / Math.abs(expectedProfitPerTrade))
+                  : 0;
+                
+                const tradesTillMaxDD = expectedProfitPerTrade !== 0 
+                  ? Math.ceil(maxDDAmount / Math.abs(expectedProfitPerTrade))
+                  : 0;
+                
+                // Risk Analysis
+                const riskPercentage = accSize > 0 ? (riskPerTrade / accSize) * 100 : 0;
+                const aggressiveness = riskPercentage > 3 
+                  ? '🚨 DANGEROUS - High blow-up risk' 
+                  : riskPercentage > 2 
+                  ? '⚠️ AGGRESSIVE - Account at risk' 
+                  : riskPercentage > 1 
+                  ? '⚡ MODERATE - Reasonable risk' 
+                  : '✅ CONSERVATIVE - Safe risk level';
+                
+                const aggressivenessColor = riskPercentage > 3 
+                  ? 'text-red-500' 
+                  : riskPercentage > 2 
+                  ? 'text-orange-500' 
+                  : riskPercentage > 1 
+                  ? 'text-yellow-500' 
+                  : 'text-emerald-500';
+                
+                return (
+                  <>
+                    {/* Results Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      {/* Total Trades Needed */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0 }}
+                        className="p-4 rounded-lg bg-gradient-to-br from-cyan-500/15 to-background/50 border-2 border-cyan-500/40 hover:border-cyan-500/70 transition-all"
+                      >
+                        <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Total Trades</p>
+                        <p className="text-2xl font-bold text-cyan-400">{tradesNeeded}</p>
+                        <p className="text-xs text-muted-foreground mt-2">To reach ${targetProfitDollars.toFixed(0)} goal</p>
+                      </motion.div>
+                    
+                    {/* Expected Winning Trades */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.05 }}
+                      className="p-4 rounded-lg bg-gradient-to-br from-emerald-500/15 to-background/50 border-2 border-emerald-500/40 hover:border-emerald-500/70 transition-all"
+                    >
+                      <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Expected Wins</p>
+                      <p className="text-2xl font-bold text-emerald-400">{expectedWins}</p>
+                      <p className="text-xs text-muted-foreground mt-2">{setupWinRate.toFixed(1)}% win rate</p>
+                    </motion.div>
+                    
+                    {/* Expected Losing Trades */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="p-4 rounded-lg bg-gradient-to-br from-rose-500/15 to-background/50 border-2 border-rose-500/40 hover:border-rose-500/70 transition-all"
+                    >
+                      <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Expected Losses</p>
+                      <p className="text-2xl font-bold text-rose-400">{expectedLosses}</p>
+                      <p className="text-xs text-muted-foreground mt-2">{(100 - setupWinRate).toFixed(1)}% loss rate</p>
+                    </motion.div>
+                    
+                    {/* Expected Profit per Trade */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15 }}
+                      className="p-4 rounded-lg bg-gradient-to-br from-amber-500/15 to-background/50 border-2 border-amber-500/40 hover:border-amber-500/70 transition-all"
+                    >
+                      <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Expectancy/Trade</p>
+                      <p className="text-2xl font-bold text-amber-400">${expectedProfitPerTrade.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground mt-2">Avg profit per trade</p>
+                    </motion.div>
+                    
+                    {/* Risk vs Reward */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="p-4 rounded-lg bg-gradient-to-br from-blue-500/15 to-background/50 border-2 border-blue-500/40 hover:border-blue-500/70 transition-all"
+                    >
+                      <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Setup RR Ratio</p>
+                      <p className="text-2xl font-bold text-blue-400">1:{setupRR.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground mt-2">Risk-Reward ratio</p>
+                    </motion.div>
+                    </div>
+
+                    {/* Risk Management Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+                      {/* Trades Till Daily Loss Limit */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.25 }}
+                        className="p-4 rounded-lg bg-gradient-to-br from-orange-500/15 to-background/50 border-2 border-orange-500/40 hover:border-orange-500/70 transition-all"
+                      >
+                        <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Trades Till Daily Loss</p>
+                        <p className="text-2xl font-bold text-orange-400">{tradesTillDailyLoss}</p>
+                        <p className="text-xs text-muted-foreground mt-2">Limit: ${dailyLossAmount.toFixed(0)}</p>
+                      </motion.div>
+
+                      {/* Trades Till Max Drawdown */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="p-4 rounded-lg bg-gradient-to-br from-red-500/15 to-background/50 border-2 border-red-500/40 hover:border-red-500/70 transition-all"
+                      >
+                        <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Trades Till Max DD</p>
+                        <p className="text-2xl font-bold text-red-400">{tradesTillMaxDD}</p>
+                        <p className="text-xs text-muted-foreground mt-2">Limit: ${maxDDAmount.toFixed(0)}</p>
+                      </motion.div>
+
+                      {/* Risk Capacity Summary */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.35 }}
+                        className={`p-4 rounded-lg bg-gradient-to-br from-violet-500/15 to-background/50 border-2 border-violet-500/40 hover:border-violet-500/70 transition-all`}
+                      >
+                        <p className="text-xs text-muted-foreground font-semibold uppercase mb-3">Risk Capacity Summary</p>
+                        
+                        <div className="space-y-2">
+                          {/* Risk Per Trade */}
+                          <div className="flex justify-between items-center">
+                            <p className="text-xs text-muted-foreground">Risk/Trade:</p>
+                            <span className="text-sm text-violet-400 font-semibold">${riskPerTrade.toFixed(2)}</span>
+                          </div>
+                          
+                          {/* Risk Percentage */}
+                          <div className="flex justify-between items-center">
+                            <p className="text-xs text-muted-foreground">Risk %:</p>
+                            <span className="text-sm text-violet-400 font-semibold">{riskPercentage.toFixed(2)}% per trade</span>
+                          </div>
+                          
+                          {/* Expectancy */}
+                          <div className="flex justify-between items-center">
+                            <p className="text-xs text-muted-foreground">Expectancy:</p>
+                            <span className="text-sm text-violet-400 font-semibold">${expectedProfitPerTrade.toFixed(2)}</span>
+                          </div>
+                          
+                          {/* Win Rate */}
+                          <div className="flex justify-between items-center">
+                            <p className="text-xs text-muted-foreground">Win Rate:</p>
+                            <span className="text-sm text-violet-400 font-semibold">{setupWinRate.toFixed(1)}%</span>
+                          </div>
+
+                          {/* Aggressiveness Warning */}
+                          <div className="mt-3 pt-3 border-t border-violet-500/20">
+                            <p className={`text-xs font-bold ${aggressivenessColor}`}>
+                              {aggressiveness}
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </div>
+                  </>
+                );
+              })()}
+            </motion.div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* SECTION 2: SESSION PERFORMANCE */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+
+          <div className="pt-6 pb-4">
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <div className="h-px flex-1 bg-gradient-to-r from-blue-500/50 to-transparent"></div>
+               Session Performance
+              <div className="h-px flex-1 bg-gradient-to-l from-blue-500/50 to-transparent"></div>
+            </h2>
           </div>
 
           {/* 7 Session Performance - Compact Cards */}
-          <div>
-            <p className="text-sm font-semibold text-foreground mb-3"> Session Performance</p>
-            <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2">
+          <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2">
               {metrics.sessionStats.map((session, idx) => (
                 <motion.div
                   key={idx}
@@ -398,19 +840,24 @@ export const WeekdayAnalysisSection = ({ trades }: TradeData) => {
                   </Card>
                 </motion.div>
               ))}
-            </div>
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* SECTION 3: SETUP PERFORMANCE */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+
+          <div className="pt-6 pb-4">
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <div className="h-px flex-1 bg-gradient-to-r from-violet-500/50 to-transparent"></div>
+               Setup Performance
+              <div className="h-px flex-1 bg-gradient-to-l from-violet-500/50 to-transparent"></div>
+            </h2>
           </div>
 
           {/* Setup Performance */}
           {metrics.setupStats.length > 0 && (
             <Card className="p-5 border border-violet-500/30 bg-violet-500/5">
               <div className="space-y-4">
-                {/* Header */}
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Setup Performance</p>
-                  <p className="text-xs text-muted-foreground mt-1">Win rate and performance metrics for each setup</p>
-                </div>
-
                 {/* Scrollable Table Container */}
                 <div className="relative border border-violet-500/30 rounded-lg overflow-hidden">
                   <div className="overflow-y-auto max-h-80 scrollbar-hide">
@@ -444,16 +891,22 @@ export const WeekdayAnalysisSection = ({ trades }: TradeData) => {
             </Card>
           )}
 
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* SECTION 4: SYMBOL + SETUP + SESSION DETAILS */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+
+          <div className="pt-6 pb-4">
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <div className="h-px flex-1 bg-gradient-to-r from-indigo-500/50 to-transparent"></div>
+               Symbol + Setup + Session Details
+              <div className="h-px flex-1 bg-gradient-to-l from-indigo-500/50 to-transparent"></div>
+            </h2>
+          </div>
+
           {/* Combined Symbol + Setup + Session Details - With Dropdowns */}
           {metrics.combinedStats.length > 0 && (
             <Card className="p-5 border border-indigo-500/30 bg-indigo-500/5">
               <div className="space-y-4">
-                {/* Title */}
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Symbol + Setup + Session Details</p>
-                  <p className="text-xs text-muted-foreground mt-1">Filter by symbol and session to view combined performance</p>
-                </div>
-
                 {/* Filter Controls */}
                 <div className="flex flex-wrap gap-4 items-end">
                   {/* Symbol Dropdown */}
@@ -559,10 +1012,22 @@ export const WeekdayAnalysisSection = ({ trades }: TradeData) => {
             </Card>
           )}
 
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+          {/* SECTION 5: CONSISTENCY SCORE */}
+          {/* ═══════════════════════════════════════════════════════════════════════ */}
+
+          <div className="pt-6 pb-4">
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <div className="h-px flex-1 bg-gradient-to-r from-violet-500/50 to-transparent"></div>
+              📊 Weekly Consistency Score
+              <div className="h-px flex-1 bg-gradient-to-l from-violet-500/50 to-transparent"></div>
+            </h2>
+          </div>
+
           {/* Consistency Score */}
           <Card className="p-4 border border-violet-500/30 bg-violet-500/5">
             <div className="flex items-center justify-between">
-              <div><p className="text-xs text-muted-foreground font-semibold mb-1">Weekly Consistency Score</p><p className="text-xs text-muted-foreground">Higher = more stable performance</p></div>
+              <div><p className="text-xs text-muted-foreground font-semibold mb-1">Consistency Score</p><p className="text-xs text-muted-foreground">Higher = more stable performance</p></div>
               <div className="text-right"><p className="text-4xl font-bold text-violet-400">{metrics.consistencyScore}</p><p className="text-xs text-muted-foreground mt-1">/100</p></div>
             </div>
             <div className="mt-3 h-2 bg-slate-700/50 rounded-full overflow-hidden">

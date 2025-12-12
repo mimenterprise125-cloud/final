@@ -846,22 +846,29 @@ const JournalDashboard: React.FC = () => {
             </Badge>
           </div>
           <div className="border border-teal-500/20 rounded-xl p-2 sm:p-4 bg-gradient-to-b from-slate-800/30 via-slate-900/20 to-background/40 backdrop-blur-sm hover:border-teal-500/30 transition-colors duration-200" style={{ height: 320 }}>
-            {(() => {
-              const map: Record<string, number> = {};
-              for (const e of entries) {
-                const ts = e.entry_at || e.created_at || e.executed_at;
-                if (!ts) continue;
-                const key = new Date(ts).toISOString().slice(0, 10);
-                map[key] = (map[key] || 0) + Number(e.realized_amount || 0);
-              }
-              const days = Object.keys(map).sort();
-              let cum = 0;
-              const data = days.map(d => {
-                cum += map[d];
-                return { date: d, cum, daily: map[d] };
-              });
+            {entries.length < 2 ? (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
+                <div className="text-3xl"></div>
+                <p className="font-semibold">Minimum 2 trades required</p>
+                <p className="text-xs">Log at least 2 trades to see your profit consistency chart</p>
+              </div>
+            ) : (
+              (() => {
+                const map: Record<string, number> = {};
+                for (const e of entries) {
+                  const ts = e.entry_at || e.created_at || e.executed_at;
+                  if (!ts) continue;
+                  const key = new Date(ts).toISOString().slice(0, 10);
+                  map[key] = (map[key] || 0) + Number(e.realized_amount || 0);
+                }
+                const days = Object.keys(map).sort();
+                let cum = 0;
+                const data = days.map(d => {
+                  cum += map[d];
+                  return { date: d, cum, daily: map[d] };
+                });
 
-              return data.length > 0 ? (
+                return data.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>
                   <LineChart data={data} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
                     <defs>
@@ -919,8 +926,9 @@ const JournalDashboard: React.FC = () => {
                   <div className="text-3xl">📊</div>
                   <p>No trades yet. Start logging trades to see your profit consistency!</p>
                 </div>
-              )
-            })()}
+              );
+              })()
+            )}
           </div>
           <div className="mt-3 sm:mt-4 flex flex-wrap gap-2 text-xs sm:text-sm">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20">

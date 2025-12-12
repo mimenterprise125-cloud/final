@@ -102,6 +102,12 @@ const Performance = () => {
   const [entries, setEntries] = useState<any[]>([])
   const [selectedSession, setSelectedSession] = useState<any | null>(null)
   const [sessionModalOpen, setSessionModalOpen] = useState(false)
+  const [accountSize, setAccountSize] = useState<number | string>('')
+  const [dailyLossLimit, setDailyLossLimit] = useState<number | string>('')
+  const [maxDD, setMaxDD] = useState<number | string>('')
+  const [selectedSetup, setSelectedSetup] = useState<string>('')
+  const [availableSetups, setAvailableSetups] = useState<string[]>([])
+  const [targetProfit, setTargetProfit] = useState<number | string>('')
 
   useEffect(() => {
     let mounted = true
@@ -334,6 +340,10 @@ const Performance = () => {
           bestSession: sessionStats.sort((a,b) => b.pnl - a.pnl)[0] || null
         })
         setEntries(r)
+        
+        // Extract available setups from entries
+        const uniqueSetups = [...new Set(r.map((row:any) => (row.setup || '—').toString()))].filter((s:string) => s !== '—').sort()
+        setAvailableSetups(uniqueSetups as string[])
       } catch (err) {
         console.error('Failed to load performance', err)
       } finally {
@@ -967,7 +977,15 @@ const Performance = () => {
           </motion.div>
 
       {/* WEEKDAY ANALYSIS SECTION */}
-      <WeekdayAnalysisSection trades={entries} />
+      <WeekdayAnalysisSection 
+        trades={entries}
+        accountSize={accountSize}
+        dailyLossLimit={dailyLossLimit}
+        maxDD={maxDD}
+        selectedSetup={selectedSetup}
+        targetProfit={targetProfit}
+        availableSetups={availableSetups}
+      />
         </>
       )}
     </div>
