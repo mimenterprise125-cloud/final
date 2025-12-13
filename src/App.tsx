@@ -70,7 +70,11 @@ const App = () => (
           <Route path="/dashboard/payouts" element={<AuthGuard><DashboardLayout><Payouts /></DashboardLayout></AuthGuard>} />
           <Route path="/dashboard/settings" element={<AuthGuard><DashboardLayout><Settings /></DashboardLayout></AuthGuard>} />
 
-          {/* Catch-all */}
+          {/* Email verification routes */}
+          <Route path="/verify" element={<AuthCallback />} />
+          <Route path="/confirm" element={<AuthCallback />} />
+
+          {/* Catch-all - Must be last */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </DashboardProvider>

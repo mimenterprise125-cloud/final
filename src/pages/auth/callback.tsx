@@ -20,10 +20,29 @@ export function AuthCallback() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        // Check if this is an email verification (contains tokens in URL)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const searchParams = new URLSearchParams(window.location.search);
+        
+        const hasTokens = 
+          hashParams.has('access_token') || 
+          hashParams.has('refresh_token') ||
+          searchParams.has('token') ||
+          searchParams.has('type');
+
+        if (hasTokens) {
+          // Email verification - Supabase will auto-handle it
+          console.log('Processing email verification...');
+          
+          // Wait a bit longer for email verification
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+
         // Get the session that was just created by Supabase
         const { data, error } = await supabase.auth.getSession();
 
@@ -33,13 +52,19 @@ export function AuthCallback() {
 
         if (data.session) {
           // ✅ Session established successfully
-          // For HashRouter, navigate() automatically handles the # prefix
-          navigate('/dashboard/journal', { replace: true });
+          console.log('Authentication successful');
+          setSuccess(true);
+          
+          // Show success message briefly before redirect
+          setTimeout(() => {
+            navigate('/dashboard/journal', { replace: true });
+          }, 1000);
         } else {
           // ⚠️ No session found - redirect back to login
-          // User probably closed the OAuth window or something went wrong
           console.warn('No session found after OAuth callback');
-          navigate('/login', { replace: true });
+          setTimeout(() => {
+            navigate('/login', { replace: true });
+          }, 1500);
         }
       } catch (err) {
         // ❌ Error during authentication
@@ -55,18 +80,27 @@ export function AuthCallback() {
     };
 
     // Give Supabase a moment to process the callback URL
-    // Increased from 100ms to 500ms to ensure session is established
-    const timer = setTimeout(handleCallback, 500);
+    const timer = setTimeout(handleCallback, 300);
     return () => clearTimeout(timer);
   }, [navigate]);
 
-  if (loading) {
+  if (loading || success) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="text-center">
-          <Loader className="w-12 h-12 animate-spin text-cyan-500 mx-auto mb-4" />
-          <p className="text-gray-600">Completing sign in...</p>
-          <p className="text-sm text-gray-500 mt-2">Please wait while we authenticate your account</p>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-cyan-50 to-blue-50">
+        <div className="text-center bg-white p-8 rounded-2xl shadow-xl max-w-md">
+          {success ? (
+            <>
+              <div className="text-6xl mb-4">✓</div>
+              <h2 className="text-2xl font-bold text-green-600 mb-2">Email Verified!</h2>
+              <p className="text-gray-600">Redirecting to your dashboard...</p>
+            </>
+          ) : (
+            <>
+              <Loader className="w-16 h-16 animate-spin text-cyan-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">Verifying your email...</h2>
+              <p className="text-gray-600">Please wait while we confirm your account</p>
+            </>
+          )}
         </div>
       </div>
     );
