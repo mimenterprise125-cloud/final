@@ -9,12 +9,14 @@ interface UnderDevelopmentProps {
   title: string;
   description?: string;
   type?: 'development' | 'premium';
+  features?: string[];
 }
 
 const UnderDevelopment: React.FC<UnderDevelopmentProps> = ({
   title,
   description,
   type = 'development',
+  features,
 }) => {
   const navigate = useNavigate();
 
@@ -150,22 +152,22 @@ const UnderDevelopment: React.FC<UnderDevelopmentProps> = ({
           {/* Benefits List for Premium */}
           {isPremium && (
             <motion.div
-              className="pt-6 space-y-3"
+              className="pt-6 space-y-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
             >
-              <p className="text-gray-400 font-semibold">You'll get access to:</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[
+              <p className="text-gray-400 font-semibold text-center">You'll get access to:</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-md mx-auto">
+                {(features || [
                   'Advanced Analytics',
                   'AI-Powered Insights',
                   'Priority Support',
                   'Unlimited Features',
-                ].map((feature, idx) => (
+                ]).map((feature, idx) => (
                   <div key={idx} className="flex items-center gap-2 text-gray-300">
-                    <div className="w-2 h-2 bg-purple-400 rounded-full" />
-                    {feature}
+                    <div className="w-2 h-2 bg-purple-400 rounded-full flex-shrink-0" />
+                    <span className="text-sm">{feature}</span>
                   </div>
                 ))}
               </div>
