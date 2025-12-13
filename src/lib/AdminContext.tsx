@@ -207,7 +207,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       // If user not authenticated, set defaults
       if (!user) {
-        console.log('❌ User not authenticated, setting default counts');
+        //console.log('❌ User not authenticated, setting default counts');
         setAdminSettings((prev) => ({
           ...prev,
           total_user_count: 1,
@@ -229,10 +229,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           totalUsers = data[0].total_auth_users || data[0].total_profiles || 0;
           // Use real online users count if available, otherwise estimate
           activeUsers = data[0].online_users_count || Math.ceil(totalUsers * 0.65);
-          console.log('📊 Online users (real-time):', activeUsers);
+          //console.log('📊 Online users (real-time):', activeUsers);
         }
       } catch (rpcErr) {
-        console.log('⚠️ RPC function not available yet, falling back to profiles table');
+        //console.log('⚠️ RPC function not available yet, falling back to profiles table');
       }
 
       // Method 2: If RPC didn't work, count from profiles table
@@ -243,7 +243,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             .select('*', { count: 'exact', head: true });
 
           if (!error && count) {
-            console.log('✅ Got user count from profiles table:', count);
+            //console.log('✅ Got user count from profiles table:', count);
             totalUsers = count || 0;
             
             // Try to get real online count from user_sessions
@@ -255,7 +255,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               
               if (!sessionError && onlineCount !== null) {
                 activeUsers = onlineCount;
-                console.log('✅ Got online users from sessions:', activeUsers);
+                //console.log('✅ Got online users from sessions:', activeUsers);
               } else {
                 activeUsers = Math.ceil(totalUsers * 0.65);
               }
@@ -264,7 +264,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
           }
         } catch (err) {
-          console.log('⚠️ Could not count from profiles table:', err);
+          //console.log('⚠️ Could not count from profiles table:', err);
         }
       }
 
@@ -274,7 +274,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         activeUsers = 1;
       }
 
-      console.log('📊 Final user counts - Total:', totalUsers, 'Online:', activeUsers);
+      //console.log('📊 Final user counts - Total:', totalUsers, 'Online:', activeUsers);
       
       setAdminSettings((prev) => ({
         ...prev,

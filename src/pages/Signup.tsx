@@ -62,27 +62,22 @@ const Signup = () => {
           email: email, 
           password,
           options: {
-            redirectTo: getOAuthRedirectUrl('/auth/callback')
+            redirectTo: getOAuthRedirectUrl('/auth/callback'),
+            emailRedirectTo: getOAuthRedirectUrl('/auth/callback')
           }
         })
+
+        console.log('📧 Signup result:', result);
+        console.log('User data:', result.data.user);
+        console.log('Session:', result.data.session);
 
         // Successful signup: Supabase may return different responses depending on
         // whether email confirmation is required. Show the friendly next-step message
         // when there's no error.
         if (!result.error && result.data.user) {
-          // Create a profile entry for the new user
-          try {
-            await supabase
-              .from('profiles')
-              .insert({
-                id: result.data.user.id,
-                full_name: fullName || email.split('@')[0],
-              });
-            console.log('✅ Profile created for user:', result.data.user.id);
-          } catch (profileErr) {
-            console.warn('⚠️ Could not create profile (may already exist):', profileErr);
-          }
-
+          // Note: Profile creation is handled automatically by Supabase trigger
+          // on_auth_user_created when the user is created in auth.users table
+          
           toast({ 
             title: '✅ Signup successful!', 
             description: 'Check your email for a verification link. Click it to activate your account.',

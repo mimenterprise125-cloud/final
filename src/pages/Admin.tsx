@@ -7,6 +7,8 @@ import { useAdmin } from '@/lib/AdminContext';
 import { useAuth } from '@/lib/AuthProvider';
 import { motion } from 'framer-motion';
 import { PricingManagementTab } from '@/components/PricingManagementTab';
+import { SocialLinksManager } from '@/components/SocialLinksManager';
+import Footer from '@/components/Footer';
 import {
   AlertCircle,
   Users,
@@ -20,15 +22,16 @@ import {
   LogOut,
   Eye,
   EyeOff,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-type TabType = 'overview' | 'errors' | 'users' | 'pricing' | 'features' | 'maintenance';
+type TabType = 'overview' | 'errors' | 'users' | 'pricing' | 'features' | 'maintenance' | 'links';
 
 const Admin = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { adminSettings, loading, error, updateSettings, toggleMaintenanceMode, togglePricingEnabled, togglePropFirmLock, toggleJournalLock, togglePerformanceAnalyticsLock, clearErrorLogs, updatePricingTiers } = useAdmin();
+  const { adminSettings, loading, error, updateSettings, toggleMaintenanceMode, togglePricingEnabled, togglePropFirmLock, toggleJournalLock, togglePerformanceAnalyticsLock, clearErrorLogs, updatePricingTiers, updateSocialLinks } = useAdmin();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showPricingForm, setShowPricingForm] = useState(false);
   const [pricingTiers, setPricingTiers] = useState(adminSettings.pricing_tiers);
@@ -61,11 +64,11 @@ const Admin = () => {
 
   // Log when adminSettings changes
   useEffect(() => {
-    console.log('🔄 [Admin.tsx] adminSettings changed:', {
-      propfirm_locked: adminSettings.propfirm_locked,
-      journal_locked: adminSettings.journal_locked,
-      performance_analytics_locked: adminSettings.performance_analytics_locked,
-    });
+    //console.log('🔄 [Admin.tsx] adminSettings changed:', {
+      //propfirm_locked: adminSettings.propfirm_locked,
+      //journal_locked: adminSettings.journal_locked,
+      //performance_analytics_locked: adminSettings.performance_analytics_locked,
+    //});
   }, [adminSettings]);
 
   // Show loading while checking role
@@ -165,6 +168,7 @@ const Admin = () => {
           { tab: 'users', label: 'Users', icon: Users },
           { tab: 'pricing', label: 'Pricing', icon: DollarSign },
           { tab: 'features', label: 'Features', icon: Lock },
+          { tab: 'links', label: 'Links', icon: LinkIcon },
           { tab: 'maintenance', label: 'Maintenance', icon: Power },
         ].map(({ tab, label, icon: Icon }) => (
           <button
@@ -368,9 +372,9 @@ const Admin = () => {
                 </Card>
 
                 <Card className="bg-slate-800/50 border-slate-700 p-6">
-                  <div className="text-sm text-gray-400 mb-2">Active Users</div>
-                  <div className="text-5xl font-bold text-emerald-400">{Math.floor(adminSettings.total_user_count * 0.65)}</div>
-                  <p className="text-gray-500 text-sm mt-4">Users active this month</p>
+                  <div className="text-sm text-gray-400 mb-2">Active Users (Last 30m)</div>
+                  <div className="text-5xl font-bold text-emerald-400">{adminSettings.active_user_count}</div>
+                  <p className="text-gray-500 text-sm mt-4">Users active in last 30 minutes</p>
                 </Card>
               </div>
 
@@ -378,22 +382,29 @@ const Admin = () => {
                 <h3 className="text-lg font-semibold mb-4">User Stats</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-400">Total Accounts</span>
+                    <span className="text-gray-400">Total Registered Users</span>
                     <span className="text-white font-semibold">{adminSettings.total_user_count}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-400">Premium Users</span>
-                    <span className="text-white font-semibold">{Math.floor(adminSettings.total_user_count * 0.30)}</span>
+                    <span className="text-gray-400">Active Users (Last 30min)</span>
+                    <span className="text-white font-semibold">{adminSettings.active_user_count}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-400">Free Users</span>
-                    <span className="text-white font-semibold">{Math.floor(adminSettings.total_user_count * 0.70)}</span>
+                    <span className="text-gray-400">Inactive Users</span>
+                    <span className="text-white font-semibold">{adminSettings.total_user_count - adminSettings.active_user_count}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-400">Inactive (30d+)</span>
-                    <span className="text-white font-semibold">{Math.floor(adminSettings.total_user_count * 0.15)}</span>
+                    <span className="text-gray-400">Activity Rate</span>
+                    <span className="text-white font-semibold">
+                      {adminSettings.total_user_count > 0 
+                        ? Math.round((adminSettings.active_user_count / adminSettings.total_user_count) * 100) 
+                        : 0}%
+                    </span>
                   </div>
                 </div>
+                <p className="text-gray-500 text-xs mt-4">
+                  💡 Active users = users who visited in the last 30 minutes. Only counts users actually using the app.
+                </p>
               </Card>
             </div>
           </motion.div>
@@ -789,14 +800,58 @@ const Admin = () => {
           </motion.div>
         )}
 
-        {/* Maintenance Tab */}
-        {activeTab === 'maintenance' && (
+        {/* Links Tab */}
+        {activeTab === 'links' && (
           <motion.div
-            className="space-y-4"
+            className="space-y-4 sm:space-y-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            <h2 className="text-2xl font-bold">Maintenance Mode</h2>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold mb-2">Community & Social Links</h2>
+              <p className="text-xs sm:text-sm text-gray-400">Manage community and footer social media links</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              {/* Community Links */}
+              <Card className="bg-slate-800/50 border-slate-700 p-3 sm:p-6">
+                <SocialLinksManager
+                  links={adminSettings.community_links}
+                  linkType="community"
+                  onUpdate={async (updatedCommunityLinks) => {
+                    // Combine community and footer links for update
+                    const allLinks = [...updatedCommunityLinks, ...adminSettings.footer_social_links];
+                    await updateSocialLinks(allLinks);
+                  }}
+                  isLoading={loading}
+                />
+              </Card>
+
+              {/* Footer Social Links */}
+              <Card className="bg-slate-800/50 border-slate-700 p-6">
+                <SocialLinksManager
+                  links={adminSettings.footer_social_links}
+                  linkType="footer"
+                  onUpdate={async (updatedFooterLinks) => {
+                    // Combine community and footer links for update
+                    const allLinks = [...adminSettings.community_links, ...updatedFooterLinks];
+                    await updateSocialLinks(allLinks);
+                  }}
+                  isLoading={loading}
+                />
+              </Card>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Maintenance Tab */}
+        {activeTab === 'maintenance' && (
+          <motion.div
+            className="space-y-4 sm:space-y-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <h2 className="text-xl sm:text-2xl font-bold">Maintenance Mode</h2>
 
             <Card className="bg-slate-800/50 border-slate-700 p-8">
               <div className="text-center">
@@ -809,6 +864,9 @@ const Admin = () => {
                     ? 'The website is currently showing the maintenance page to all users.'
                     : 'The website is operating normally. Toggle to put the site in maintenance mode.'}
                 </p>
+
+                <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-center">
+                </div>
 
                 <Button
                   onClick={() => toggleMaintenanceMode()}
@@ -842,6 +900,9 @@ const Admin = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };
