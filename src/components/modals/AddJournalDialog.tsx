@@ -152,6 +152,37 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
     };
   }, [files]);
 
+  // Auto-calculate SL/TP points (in pips) whenever entry/SL/TP or symbol changes
+  useEffect(() => {
+    try {
+      const entry = parseFloat(formData.entry_price || '0');
+      if (!formData.entry_price || isNaN(entry)) return;
+
+      if (formData.stop_loss_price) {
+        const sl = parseFloat(formData.stop_loss_price || '0');
+        if (!isNaN(sl)) {
+          const computed = Math.round(calculatePointsFromPrice(entry, sl, formData.symbol));
+          // only update if different to avoid rerenders
+          if (String(formData.stop_loss_points || '') !== String(computed)) {
+            setFormData((f:any) => ({ ...f, stop_loss_points: String(computed) }));
+          }
+        }
+      }
+
+      if (formData.target_price) {
+        const tp = parseFloat(formData.target_price || '0');
+        if (!isNaN(tp)) {
+          const computedTp = Math.round(calculatePointsFromPrice(entry, tp, formData.symbol));
+          if (String(formData.target_points || '') !== String(computedTp)) {
+            setFormData((f:any) => ({ ...f, target_points: String(computedTp) }));
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [formData.entry_price, formData.stop_loss_price, formData.target_price, formData.symbol]);
+
   // Enhanced validation with comprehensive cross-field checks
   useEffect(() => {
     const errs: Record<string,string> = {};
@@ -246,6 +277,32 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
       }
       if (tpPoints < 0) {
         errs.target_points = 'Target points must be positive';
+      }
+    } catch (e) {}
+
+    // === PRICE DIRECTION VALIDATION ===
+    try {
+      const entry = parseFloat(formData.entry_price || '0');
+      const sl = parseFloat(formData.stop_loss_price || '0');
+      const tp = parseFloat(formData.target_price || '0');
+      if (formData.direction === 'Buy') {
+        if (formData.stop_loss_price && !isNaN(entry) && !isNaN(sl) && !(sl < entry)) {
+          errs.stop_loss_price = 'For Buy direction the stop loss price must be less than the entry price';
+          errs.stop_loss = errs.stop_loss_price;
+        }
+        if (formData.target_price && !isNaN(entry) && !isNaN(tp) && !(tp > entry)) {
+          errs.target_price = 'For Buy direction the target price must be greater than the entry price';
+          errs.target = errs.target_price;
+        }
+      } else if (formData.direction === 'Sell') {
+        if (formData.stop_loss_price && !isNaN(entry) && !isNaN(sl) && !(sl > entry)) {
+          errs.stop_loss_price = 'For Sell direction the stop loss price must be greater than the entry price';
+          errs.stop_loss = errs.stop_loss_price;
+        }
+        if (formData.target_price && !isNaN(entry) && !isNaN(tp) && !(tp < entry)) {
+          errs.target_price = 'For Sell direction the target price must be less than the entry price';
+          errs.target = errs.target_price;
+        }
       }
     } catch (e) {}
 
@@ -1156,7 +1213,9 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                     <span className="text-rose-400 text-xs">⚠️</span>
                   </div>
                   <Input 
-                    className={`h-11 px-4 text-sm bg-background/50 text-rose-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 transition-all border-2 border-rose-500`} 
+                    className={`h-11 px-4 text-sm bg-background/50 text-rose-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400/50 transition-all ${
+                      errors.stop_loss ? 'border-2 border-rose-500' : 'border border-rose-400/30'
+                    }`} 
                     type="number" 
                     step="0.01" 
                     value={formData.stop_loss_price} 
@@ -1164,6 +1223,12 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                     disabled={formData.result === "MANUAL"} 
                     placeholder="e.g., 4640"
                   />
+                  {errors.stop_loss && (
+                    <div className="flex items-center gap-1 text-rose-400 text-xs mt-1">
+                      <span>⚠️</span>
+                      <span>{errors.stop_loss}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col space-y-2">
                   <div className="flex items-center gap-1">
@@ -1183,6 +1248,12 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                     disabled={formData.result === "MANUAL"}
                     placeholder="e.g., 4670"
                   />
+                  {errors.target && (
+                    <div className="flex items-center gap-1 text-rose-400 text-xs mt-1">
+                      <span>⚠️</span>
+                      <span>{errors.target}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1214,23 +1285,16 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
 
             {/* RR Ratio Display */}
             {(formData.entry_price && formData.stop_loss_price && formData.target_price) && (
-              <div className="bg-accent/10 rounded-lg p-4 border border-accent/30">
-                <p className="text-xs font-semibold text-accent mb-2">Risk-Reward Ratio</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-accent">
+              <div className="inline-flex items-center gap-3 bg-accent/10 rounded-md px-3 py-2 border border-accent/30">
+                <p className="text-[11px] font-semibold text-accent m-0 leading-none">RR</p>
+                <div className="flex items-center">
+                  <span className="text-sm font-bold text-accent leading-none">
                     {(() => {
                       const tpPips = Math.round(calculatePointsFromPrice(parseFloat(formData.entry_price), parseFloat(formData.target_price), formData.symbol));
                       const slPips = Math.round(calculatePointsFromPrice(parseFloat(formData.entry_price), parseFloat(formData.stop_loss_price), formData.symbol));
                       if (slPips === 0) return 'N/A';
                       const rr = tpPips / slPips;
                       return `1:${rr.toFixed(2)}`;
-                    })()}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {(() => {
-                      const tpPips = Math.round(calculatePointsFromPrice(parseFloat(formData.entry_price), parseFloat(formData.target_price), formData.symbol));
-                      const slPips = Math.round(calculatePointsFromPrice(parseFloat(formData.entry_price), parseFloat(formData.stop_loss_price), formData.symbol));
-                      return `(${slPips} pips risk → ${tpPips} pips reward)`;
                     })()}
                   </span>
                 </div>
