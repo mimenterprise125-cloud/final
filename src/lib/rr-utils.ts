@@ -94,9 +94,18 @@ export const calculatePointsFromPrice = (
   priceB: number,
   symbol: string
 ): number => {
-  const priceDifference = Math.abs(priceA - priceB);
+  // Ensure numeric inputs
+  const a = Number(priceA || 0);
+  const b = Number(priceB || 0);
+  if (!isFinite(a) || !isFinite(b)) return 0;
+
+  const priceDifference = Math.abs(a - b);
   const pipSize = getPipSize(symbol);
-  return pipSize > 0 ? priceDifference / pipSize : 0;
+
+  // Points (pips) = Price Difference / Pip Size
+  // Return an integer number of points (rounded)
+  if (!pipSize || pipSize <= 0) return 0;
+  return Math.round(priceDifference / pipSize);
 };
 
 /**
