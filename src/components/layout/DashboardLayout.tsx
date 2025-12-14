@@ -70,6 +70,32 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             <PanelLeft className="w-5 h-5" />
           </Button>
           <span className="text-sm font-semibold text-muted-foreground">Menu</span>
+
+          {/* Mobile view-mode toggle placed to the right */}
+          <div className="ml-auto inline-flex rounded-lg bg-muted/50 border border-border/60 p-1 sm:p-1.5 shadow-sm backdrop-blur-sm">
+            <button
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all duration-200 ${
+                viewMode === 'propfirm'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+              }`}
+              onClick={() => { setViewMode('propfirm'); navigate('/dashboard/propfirm'); }}
+              aria-pressed={viewMode === 'propfirm'}
+            >
+              Prop
+            </button>
+            <button
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all duration-200 ${
+                viewMode === 'journal'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+              }`}
+              onClick={() => { setViewMode('journal'); navigate('/dashboard/journal'); }}
+              aria-pressed={viewMode === 'journal'}
+            >
+              Journal
+            </button>
+          </div>
         </div>
 
         {/* Desktop Sidebar Toggle Button - visible only on lg screens */}
@@ -84,37 +110,38 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
             <PanelLeft className={cn("w-5 h-5 transition-transform duration-200", !sidebarOpen && "rotate-180")} />
           </Button>
           <span className="text-sm font-semibold text-muted-foreground">{sidebarOpen ? 'Hide' : 'Show'} Sidebar</span>
+
+          {/* Move journal/propfirm view toggle beside the sidebar toggle on desktop */}
+          <div className="inline-flex rounded-lg bg-muted/50 border border-border/60 p-1 sm:p-1.5 shadow-sm backdrop-blur-sm ml-4">
+            <button
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-md transition-all duration-200 ${
+                viewMode === 'propfirm'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg hover:shadow-xl'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+              }`}
+              onClick={() => { setViewMode('propfirm'); navigate('/dashboard/propfirm'); }}
+              aria-pressed={viewMode === 'propfirm'}
+            >
+              Prop Firms
+            </button>
+            <button
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-md transition-all duration-200 ${
+                viewMode === 'journal'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg hover:shadow-xl'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+              }`}
+              onClick={() => { setViewMode('journal'); navigate('/dashboard/journal'); }}
+              aria-pressed={viewMode === 'journal'}
+            >
+              Journal
+            </button>
+          </div>
         </div>
 
         <main className={cn("flex-1 overflow-auto transition-all duration-300 w-full")}>
           {/* Responsive padding and view mode toggle */}
           <div className="p-3 sm:p-4 lg:p-8 space-y-4 sm:space-y-6 w-full overflow-x-hidden">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="inline-flex rounded-lg bg-muted/50 border border-border/60 p-1 sm:p-1.5 shadow-sm backdrop-blur-sm">
-                <button
-                  className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-md transition-all duration-200 ${
-                    viewMode === 'propfirm'
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg hover:shadow-xl'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                  }`}
-                  onClick={() => { setViewMode('propfirm'); navigate('/dashboard/propfirm'); }}
-                  aria-pressed={viewMode === 'propfirm'}
-                >
-                  Prop Firms
-                </button>
-                <button
-                  className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-md transition-all duration-200 ${
-                    viewMode === 'journal'
-                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg hover:shadow-xl'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                  }`}
-                  onClick={() => { setViewMode('journal'); navigate('/dashboard/journal'); }}
-                  aria-pressed={viewMode === 'journal'}
-                >
-                  Journal
-                </button>
-              </div>
-            </div>
+            {/* header content container (no duplicate view-mode toggle here) */}
             {children}
           </div>
         </main>
