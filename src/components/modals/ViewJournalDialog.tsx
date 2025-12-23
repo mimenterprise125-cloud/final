@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, ExternalLink } from "lucide-react";
+import { formatRealizedEntry } from "@/lib/display-utils";
 import { useModalBackButton } from "@/hooks/useModalBackButton";
 
 const scrollHideStyles = `
@@ -97,7 +98,7 @@ export const ViewJournalDialog = ({ open, onOpenChange, entry }: ViewJournalDial
               <Card className={`p-2 sm:p-3 border-border/30 ${isWin ? 'bg-emerald-500/10 border-emerald-500/30' : isLoss ? 'bg-rose-500/10 border-rose-500/30' : 'bg-background/40'}`}>
                 <p className="text-xs text-muted-foreground font-medium">P&L</p>
                 <p className={`text-xs sm:text-sm font-bold mt-1 ${isWin ? 'text-emerald-400' : isLoss ? 'text-rose-400' : 'text-foreground'}`}>
-                  {isWin && '💰 '}{isLoss && '📉 '}{realized >= 0 ? '+' : ''}{realized.toFixed(2)}
+                  {isWin && '💰 '}{isLoss && '📉 '}{formatRealizedEntry(entry)}
                 </p>
               </Card>
             </div>

@@ -9,6 +9,7 @@ import supabase from "@/lib/supabase";
 import { ViewJournalDialog } from "@/components/modals/ViewJournalDialog";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthProvider";
+import { formatRealizedEntry } from "@/lib/display-utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,9 +20,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// Return a YYYY-MM-DD date string using local timezone (prevents UTC shifts altering the day)
 function formatDateKey(dt: string | Date) {
   const d = new Date(dt);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
 }
 
 interface CalendarViewProps {
@@ -49,7 +54,7 @@ function CalendarView({ entries, onOpenEntry }: CalendarViewProps) {
   }
 
   for (let d = 1; d <= daysInMonth; d++) {
-    const key = new Date(year, month, d).toISOString().slice(0, 10);
+    const key = formatDateKey(new Date(year, month, d));
     const list = mapByDate.get(key) ?? [];
     const total = list.reduce((s: any, t: any) => s + Number(t.realized_amount ?? 0), 0);
     cells.push({ date: key, trades: list, total });
@@ -128,8 +133,7 @@ function CalendarView({ entries, onOpenEntry }: CalendarViewProps) {
                       {t.symbol} • {t.setup}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {t.direction} • {(t.realized_amount) >= 0 ? '+' : ''}$
-                      {Number(t.realized_amount ?? 0).toFixed(2)}
+                      {t.direction} • {formatRealizedEntry(t)}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -182,7 +186,7 @@ function MonthlyView({
     for (const e of entries) {
       const ts = e.entry_at || e.created_at;
       if (!ts) continue;
-      const k = new Date(ts).toISOString().slice(0, 10);
+      const k = formatDateKey(ts);
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(e);
     }
@@ -194,7 +198,7 @@ function MonthlyView({
   let curWeek: ({ date: string; trades: any[]; total: number } | null)[] = [];
   for (let i = 0; i < startDay; i++) curWeek.push(null);
   for (let d = 1; d <= daysInMonth; d++) {
-    const key = new Date(year, m, d).toISOString().slice(0, 10);
+    const key = formatDateKey(new Date(year, m, d));
     const list = mapByDate.get(key) ?? [];
     const total = list.reduce((s: any, t: any) => s + Number(t.realized_amount ?? 0), 0);
     curWeek.push({ date: key, trades: list, total });
@@ -213,6 +217,7 @@ function MonthlyView({
     () =>
       entries.filter(e => {
         const ts = e.entry_at || e.created_at;
+        // compare using local date prefix (DB timestamptz stored like "YYYY-MM-DD ...")
         return ts && ts.startsWith(selMonth);
       }),
     [entries, selMonth]
@@ -802,7 +807,8 @@ const JournalDashboard: React.FC = () => {
               <div className="text-muted-foreground mb-0.5 sm:mb-1 text-xs truncate">This Month</div>
               <div className="font-bold text-cyan-400 text-xs sm:text-sm truncate">
                 {(() => {
-                  const m = new Date().toISOString().slice(0, 7);
+                  const now = new Date();
+                  const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
                   const list = entries.filter(e => e.executed_at && e.executed_at.startsWith(m));
                   return '$' + list.reduce((s: any, e: any) => s + Number(e.realized_amount ?? 0), 0).toFixed(2);
                 })()}
@@ -858,7 +864,7 @@ const JournalDashboard: React.FC = () => {
                 for (const e of entries) {
                   const ts = e.entry_at || e.created_at || e.executed_at;
                   if (!ts) continue;
-                  const key = new Date(ts).toISOString().slice(0, 10);
+                  const key = formatDateKey(ts);
                   map[key] = (map[key] || 0) + Number(e.realized_amount || 0);
                 }
                 const days = Object.keys(map).sort();

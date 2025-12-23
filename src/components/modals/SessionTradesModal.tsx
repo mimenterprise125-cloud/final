@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { calculateRRFromPrices } from '@/lib/rr-utils';
+import { formatRealizedEntry } from '@/lib/display-utils';
 
 // Hide scrollbars for tables
 const scrollbarHideStyle = `
@@ -142,7 +143,7 @@ export const SessionTradesModal = ({
                           </Badge>
                         </td>
                         <td className={`py-3 px-4 text-right font-semibold ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                          {formatRealizedEntry(trade)}
                         </td>
                         <td className="py-3 px-4 text-right text-cyan-400 font-semibold">{rr}</td>
                       </tr>

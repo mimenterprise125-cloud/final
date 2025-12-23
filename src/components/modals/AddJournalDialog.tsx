@@ -26,7 +26,15 @@ interface AddJournalDialogProps {
   onSaved?: () => void;
 }
 
-const nowLocal = () => new Date().toISOString().slice(0, 16);
+const nowLocal = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${dd}T${hh}:${mm}`; // YYYY-MM-DDTHH:MM (local)
+}
 
 export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDialogProps) => {
   const { toast } = useToast();
@@ -609,10 +617,15 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
   const durationStr = durationMinutes == null ? "" : (durationMinutes >= 60 ? `${Math.floor(durationMinutes/60)}h ${durationMinutes%60}m (${durationMinutes} min)` : `${durationMinutes} min`);
 
   // helpers to split/merge ISO datetime for separate date/time inputs
+  // Return local YYYY-MM-DD for a given ISO or local datetime string
   const isoToDate = (iso?: string) => {
     try {
       if (!iso) return "";
-      return new Date(iso).toISOString().slice(0,10); // YYYY-MM-DD
+      const d = new Date(iso);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
     } catch (e) { return "" }
   }
   const isoToTime = (iso?: string) => {
@@ -630,7 +643,10 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
     setFormData((f:any)=> ({...f, entry_at: dateStr ? `${dateStr}T${time}` : ''}));
   }
   const setEntryTime = (timeStr: string) => {
-    const date = isoToDate(formData.entry_at) || new Date().toISOString().slice(0,10);
+    const date = isoToDate(formData.entry_at) || (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    })();
     setFormData((f:any)=> ({...f, entry_at: timeStr ? `${date}T${timeStr}` : ''}));
   }
 
@@ -639,7 +655,10 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
     setFormData((f:any)=> ({...f, exit_at: dateStr ? `${dateStr}T${time}` : ''}));
   }
   const setExitTime = (timeStr: string) => {
-    const date = isoToDate(formData.exit_at) || new Date().toISOString().slice(0,10);
+    const date = isoToDate(formData.exit_at) || (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    })();
     setFormData((f:any)=> ({...f, exit_at: timeStr ? `${date}T${timeStr}` : ''}));
   }
 
@@ -697,7 +716,9 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
         return; 
       }
       const t24 = to24(hour12, minuteSel, meridiem);
-      const dateStr = selectedDate.toISOString().slice(0,10);
+      // use local date parts (avoid toISOString which converts to UTC)
+      const sd = selectedDate;
+      const dateStr = `${sd.getFullYear()}-${String(sd.getMonth()+1).padStart(2,'0')}-${String(sd.getDate()).padStart(2,'0')}`;
       onChange(`${dateStr}T${t24}`);
       setOpen(false);
     }

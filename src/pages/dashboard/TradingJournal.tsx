@@ -10,6 +10,7 @@ import { AddJournalDialog } from "@/components/modals/AddJournalDialog";
 import { EditJournalDialog } from "@/components/modals/EditJournalDialog";
 import { ViewJournalDialog } from "@/components/modals/ViewJournalDialog";
 import { calculatePointsFromPrice, calculateRRFromPrices } from "@/lib/rr-utils";
+import { formatRealizedEntry, formatRealizedValue } from "@/lib/display-utils";
 import supabase from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthProvider";
 import { useMemo } from "react";
@@ -359,7 +360,7 @@ const TradingJournal = () => {
                       
                       {/* P&L */}
                       <td className={`py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-center font-bold text-xs sm:text-sm ${isWin ? 'text-emerald-400 bg-emerald-500/10' : isLoss ? 'text-rose-400 bg-rose-500/10' : 'text-muted-foreground'}`}>
-                        <span>${Math.abs(realized).toFixed(2)}</span>
+                        <span>{formatRealizedEntry(e, { absolute: true })}</span>
                       </td>
                       
                       {/* Actions */}
@@ -509,7 +510,10 @@ const TradingJournal = () => {
 };
 
 function MonthlyView({ entries }: { entries: any[] }){
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0,7)) // YYYY-MM
+  const [month, setMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const list = useMemo(()=> entries.filter(e => e.executed_at && e.executed_at.startsWith(month)), [entries, month])
 
   const total = list.length
@@ -559,15 +563,15 @@ function MonthlyView({ entries }: { entries: any[] }){
         </Card>
         <Card className="p-3 sm:p-4 xs:col-span-2 md:col-span-2">
           <div className="text-xs sm:text-sm text-muted-foreground">Best trade</div>
-          <div className="text-base sm:text-lg font-bold mt-1">{best ? `${best.symbol} $${best.realized_amount}` : '-'}</div>
+          <div className="text-base sm:text-lg font-bold mt-1">{best ? `${best.symbol} ${formatRealizedEntry(best)}` : '-'}</div>
         </Card>
         <Card className="p-3 sm:p-4">
           <div className="text-xs sm:text-sm text-muted-foreground">Worst trade</div>
-          <div className="text-base sm:text-lg font-bold mt-1">{worst ? `${worst.symbol} $${worst.realized_amount}` : '-'}</div>
+          <div className="text-base sm:text-lg font-bold mt-1">{worst ? `${worst.symbol} ${formatRealizedEntry(worst)}` : '-'}</div>
         </Card>
         <Card className="p-3 sm:p-4 xs:col-span-2 md:col-span-3">
           <div className="text-xs sm:text-sm text-muted-foreground">Total realized</div>
-          <div className="text-xl sm:text-2xl font-bold mt-1">${totalRealized}</div>
+          <div className="text-xl sm:text-2xl font-bold mt-1">{formatRealizedValue(totalRealized, { absolute: true })}</div>
         </Card>
       </div>
     </div>
