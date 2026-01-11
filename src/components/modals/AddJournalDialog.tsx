@@ -663,70 +663,45 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Session */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="flex flex-col space-y-2">
-                <div className="flex items-center gap-1">
-                  <Label className="text-xs font-semibold text-muted-foreground">Session</Label>
-                  <span className="text-rose-500 font-bold">*</span>
-                  {errors.session && <span className="text-rose-400 text-xs ml-auto">⚠️</span>}
-                </div>
-                <div className="relative">
-                  <select className={`w-full h-11 px-4 pr-10 text-sm font-medium bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all cursor-pointer ${
-                    errors.session
-                      ? 'border-2 border-rose-500'
-                      : 'border border-border/50 hover:border-accent/40'
-                  }`} value={formData.session} onChange={(e) => setFormData({ ...formData, session: e.target.value })}>
-                    <option value="No Session">No Session</option>
-                    <option value="London">London</option>
-                    <option value="Asia">Asia</option>
-                    <option value="New York">New York</option>
-                    <option value="London Killzone">London Killzone</option>
-                    <option value="Asia Killzone">Asia Killzone</option>
-                    <option value="New York Killzone">New York Killzone</option>
-                  </select>
-                  <div className="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                  </div>
+                <Label className="text-xs font-semibold text-muted-foreground">Session</Label>
+                <span className="text-rose-500 font-bold">*</span>
+                {errors.session && <span className="text-rose-400 text-xs">⚠️</span>}
+              </div>
+              <div className="relative">
+                <select className={`w-full h-11 px-4 pr-10 text-sm font-medium bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all cursor-pointer ${
+                  errors.session
+                    ? 'border-2 border-rose-500'
+                    : 'border border-border/50 hover:border-accent/40'
+                }`} value={formData.session} onChange={(e) => setFormData({ ...formData, session: e.target.value })}>
+                  <option value="No Session">No Session</option>
+                  <option value="London">London</option>
+                  <option value="Asia">Asia</option>
+                  <option value="New York">New York</option>
+                  <option value="London Killzone">London Killzone</option>
+                  <option value="Asia Killzone">Asia Killzone</option>
+                  <option value="New York Killzone">New York Killzone</option>
+                </select>
+                <div className="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
                 </div>
               </div>
-
-              {/* Direction (Buy/Sell) */}
-              <div className="flex flex-col space-y-2">
-                <div className="flex items-center gap-1">
-                  <Label className="text-xs font-semibold text-muted-foreground">Direction</Label>
-                  <span className="text-rose-500 font-bold">*</span>
-                  {errors.direction && <span className="text-rose-400 text-xs ml-auto">⚠️</span>}
+              {errors.session && (
+                <div className="flex items-center gap-1 text-rose-400 text-xs">
+                  <span>⚠️</span>
+                  <span>{errors.session}</span>
                 </div>
-                <div className="flex gap-2">
-                  {['Buy', 'Sell'].map((dir) => (
-                    <button
-                      key={dir}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, direction: dir })}
-                      className={`flex-1 h-11 rounded-lg font-semibold text-sm transition-all ${
-                        formData.direction === dir
-                          ? dir === 'Buy' 
-                            ? 'bg-emerald-500/40 border border-emerald-400/50 text-emerald-400'
-                            : 'bg-rose-500/40 border border-rose-400/50 text-rose-400'
-                          : 'bg-background/50 border border-border/50 text-muted-foreground hover:border-accent/30'
-                      }`}
-                    >
-                      {dir === 'Buy' ? '🟢' : '🔴'} {dir}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Setup Name */}
-            <div className="flex flex-col space-y-2">
+            <div className="flex flex-col space-y-2 col-span-2">
               <div className="flex items-center gap-1">
                 <Label className="text-xs font-semibold text-muted-foreground">Setup Name</Label>
                 <span className="text-rose-500 font-bold">*</span>
-                {errors.setup_name && <span className="text-rose-400 text-xs ml-auto">⚠️</span>}
+                {errors.setup_name && <span className="text-rose-400 text-xs">⚠️</span>}
               </div>
               <div className="flex gap-2 items-start">
                 <div className="flex-1">
@@ -734,7 +709,7 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                     <select 
                       value={formData.setup_name || ''} 
                       onChange={(e) => setFormData({ ...formData, setup_name: e.target.value })}
-                      className={`w-full h-11 px-4 pr-10 text-sm bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors cursor-pointer ${
+                      className={`w-full h-10 px-3 pr-10 text-sm bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors cursor-pointer ${
                         errors.setup_name
                           ? 'border-2 border-rose-500'
                           : 'border border-border/50'
@@ -759,18 +734,19 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                   variant="outline" 
                   onClick={() => setAddSetupOpen(true)} 
                   size="sm" 
-                  className="h-11 border-border/50 hover:bg-accent/20 flex-shrink-0"
+                  className="h-10 border-border/50 hover:bg-accent/20 flex-shrink-0"
                 >
                   ➕ Add
                 </Button>
               </div>
             </div>
 
-            {/* Setup Rating */}
             <div className="flex flex-col space-y-2">
               <div className="flex items-center gap-1">
                 <Label className="text-xs font-semibold text-muted-foreground">Setup Rating</Label>
-                <span className="text-muted-foreground text-xs">(Optional)</span>
+                <span className="text-rose-500 font-bold">*</span>
+                <span className="text-rose-500 font-bold">*</span>
+                {errors.setup_rating && <span className="text-rose-400 text-xs">⚠️</span>}
               </div>
               <div className="flex gap-1 sm:gap-2">
                 {['B', 'B+', 'A-', 'A', 'A+'].map((rating) => (
@@ -778,7 +754,7 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                     key={rating}
                     type="button"
                     onClick={() => setFormData({ ...formData, setup_rating: rating })}
-                    className={`flex-1 h-10 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
+                    className={`flex-1 h-8 sm:h-10 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
                       formData.setup_rating === rating
                         ? 'bg-accent/40 border border-accent/50 text-accent'
                         : 'bg-background/50 border border-border/50 text-muted-foreground hover:border-accent/30'
@@ -788,15 +764,28 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                   </button>
                 ))}
               </div>
+              {errors.setup_rating && (
+                <div className="flex items-center gap-1 text-rose-400 text-xs">
+                  <span>⚠️</span>
+                  <span>{errors.setup_rating}</span>
+                </div>
+              )}
             </div>
+          </div>
 
-            {/* Execution Type */}
+          <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col space-y-2">
               <div className="flex items-center gap-1">
                 <Label className="text-xs font-semibold text-muted-foreground">Execution Type</Label>
+                <span className="text-rose-500 font-bold">*</span>
+                {errors.execution_type && <span className="text-rose-400 text-xs">⚠️</span>}
               </div>
               <div className="relative">
-                <select className={`w-full h-11 px-4 pr-10 text-sm font-medium bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all cursor-pointer border border-border/50 hover:border-accent/40`} value={formData.execution_type} onChange={(e) => setFormData({ ...formData, execution_type: e.target.value })}>
+                <select className={`w-full h-11 px-4 pr-10 text-sm font-medium bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all cursor-pointer ${
+                  errors.execution_type
+                    ? 'border-2 border-rose-500'
+                    : 'border border-border/50 hover:border-accent/40'
+                }`} value={formData.execution_type} onChange={(e) => setFormData({ ...formData, execution_type: e.target.value })}>
                   <option value="Market">Market</option>
                   <option value="Limit">Limit</option>
                   <option value="Stop">Stop</option>
@@ -807,7 +796,8 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                   </svg>
                 </div>
               </div>
-            </div>
+              {errors.execution_type && (
+                <div className="flex items-center gap-1 text-rose-400 text-xs">
                   <span>⚠️</span>
                   <span>{errors.execution_type}</span>
                 </div>
@@ -1105,9 +1095,9 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
               )}
             </div>
           </div>
-
-            </div>
-            </div>
+           </div>
+           </div>
+            
 
           <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 px-4 sm:px-6 py-4 border-t border-border/30 flex-shrink-0 bg-gradient-to-t from-background/80 to-transparent">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Cancel</Button>
@@ -1182,6 +1172,7 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
               Save Setup
             </Button>
           </DialogFooter>
+          
         </DialogContent>
       </Dialog>
     </Dialog>
