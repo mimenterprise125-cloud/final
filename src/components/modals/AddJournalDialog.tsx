@@ -544,7 +544,7 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
               <div className="text-sm font-bold text-accent uppercase tracking-wider">Trade Setup</div>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Symbol with Save Button */}
               <div className="flex flex-col space-y-2">
                 <div className="flex items-center gap-1">
@@ -661,43 +661,76 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                   })()}
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Trade Date */}
               <div className="flex flex-col space-y-2">
-                <Label className="text-xs font-semibold text-muted-foreground">Session</Label>
-                <span className="text-rose-500 font-bold">*</span>
-                {errors.session && <span className="text-rose-400 text-xs">⚠️</span>}
-              </div>
-              <div className="relative">
-                <select className={`w-full h-11 px-4 pr-10 text-sm font-medium bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all cursor-pointer ${
-                  errors.session
-                    ? 'border-2 border-rose-500'
-                    : 'border border-border/50 hover:border-accent/40'
-                }`} value={formData.session} onChange={(e) => setFormData({ ...formData, session: e.target.value })}>
-                  <option value="No Session">No Session</option>
-                  <option value="London">London</option>
-                  <option value="Asia">Asia</option>
-                  <option value="New York">New York</option>
-                  <option value="London Killzone">London Killzone</option>
-                  <option value="Asia Killzone">Asia Killzone</option>
-                  <option value="New York Killzone">New York Killzone</option>
-                </select>
-                <div className="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
+                <Label className="text-xs font-semibold text-muted-foreground">Date of Trade</Label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={formData.trade_date}
+                    onChange={(e) => setFormData({ ...formData, trade_date: e.target.value })}
+                    className="w-full h-10 px-3 text-sm bg-background/50 text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all border border-border/50"
+                  />
                 </div>
               </div>
-              {errors.session && (
-                <div className="flex items-center gap-1 text-rose-400 text-xs">
-                  <span>⚠️</span>
-                  <span>{errors.session}</span>
-                </div>
-              )}
             </div>
 
-            <div className="flex flex-col space-y-2 col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs font-semibold text-muted-foreground">Session</Label>
+                  <span className="text-rose-500 font-bold">*</span>
+                  {errors.session && <span className="text-rose-400 text-xs">⚠️</span>}
+                </div>
+                <div className="relative">
+                  <select className={`w-full h-11 px-4 pr-10 text-sm font-medium bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all cursor-pointer ${
+                    errors.session
+                      ? 'border-2 border-rose-500'
+                      : 'border border-border/50 hover:border-accent/40'
+                  }`} value={formData.session} onChange={(e) => setFormData({ ...formData, session: e.target.value })}>
+                    <option value="No Session">No Session</option>
+                    <option value="London">London</option>
+                    <option value="Asia">Asia</option>
+                    <option value="New York">New York</option>
+                    <option value="London Killzone">London Killzone</option>
+                    <option value="Asia Killzone">Asia Killzone</option>
+                    <option value="New York Killzone">New York Killzone</option>
+                  </select>
+                  <div className="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs font-semibold text-muted-foreground">Execution Type</Label>
+                  <span className="text-rose-500 font-bold">*</span>
+                  {errors.execution_type && <span className="text-rose-400 text-xs">⚠️</span>}
+                </div>
+                <div className="relative">
+                  <select className={`w-full h-11 px-4 pr-10 text-sm font-medium bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all cursor-pointer ${
+                    errors.execution_type
+                      ? 'border-2 border-rose-500'
+                      : 'border border-border/50 hover:border-accent/40'
+                  }`} value={formData.execution_type} onChange={(e) => setFormData({ ...formData, execution_type: e.target.value })}>
+                    <option value="Market">Market</option>
+                    <option value="Limit">Limit</option>
+                    <option value="Stop">Stop</option>
+                  </select>
+                  <div className="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col space-y-2">
               <div className="flex items-center gap-1">
                 <Label className="text-xs font-semibold text-muted-foreground">Setup Name</Label>
                 <span className="text-rose-500 font-bold">*</span>
@@ -745,7 +778,6 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
               <div className="flex items-center gap-1">
                 <Label className="text-xs font-semibold text-muted-foreground">Setup Rating</Label>
                 <span className="text-rose-500 font-bold">*</span>
-                <span className="text-rose-500 font-bold">*</span>
                 {errors.setup_rating && <span className="text-rose-400 text-xs">⚠️</span>}
               </div>
               <div className="flex gap-1 sm:gap-2">
@@ -764,44 +796,6 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                   </button>
                 ))}
               </div>
-              {errors.setup_rating && (
-                <div className="flex items-center gap-1 text-rose-400 text-xs">
-                  <span>⚠️</span>
-                  <span>{errors.setup_rating}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col space-y-2">
-              <div className="flex items-center gap-1">
-                <Label className="text-xs font-semibold text-muted-foreground">Execution Type</Label>
-                <span className="text-rose-500 font-bold">*</span>
-                {errors.execution_type && <span className="text-rose-400 text-xs">⚠️</span>}
-              </div>
-              <div className="relative">
-                <select className={`w-full h-11 px-4 pr-10 text-sm font-medium bg-background/50 text-foreground rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all cursor-pointer ${
-                  errors.execution_type
-                    ? 'border-2 border-rose-500'
-                    : 'border border-border/50 hover:border-accent/40'
-                }`} value={formData.execution_type} onChange={(e) => setFormData({ ...formData, execution_type: e.target.value })}>
-                  <option value="Market">Market</option>
-                  <option value="Limit">Limit</option>
-                  <option value="Stop">Stop</option>
-                </select>
-                <div className="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
-                </div>
-              </div>
-              {errors.execution_type && (
-                <div className="flex items-center gap-1 text-rose-400 text-xs">
-                  <span>⚠️</span>
-                  <span>{errors.execution_type}</span>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1006,25 +1000,6 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
                 </datalist>
               </div>
             )}
-          </div>
-
-
-          {/* Section 4.5: Trade Date */}
-          <div className="bg-background/40 rounded-xl p-5 border border-border/30 space-y-4">
-            <div className="text-sm font-semibold text-accent mb-3"> Trade Date</div>
-            
-            <div className="flex flex-col space-y-2">
-              <Label className="text-xs font-semibold text-muted-foreground">Date of Trade</Label>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={formData.trade_date}
-                  onChange={(e) => setFormData({ ...formData, trade_date: e.target.value })}
-                  className="w-full h-11 px-4 text-sm bg-background/50 text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-all border border-border/50"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">This date will be used to organize trades in the calendar</p>
-            </div>
           </div>
 
 
