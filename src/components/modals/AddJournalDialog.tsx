@@ -148,37 +148,7 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
     };
   }, [files]);
 
-  // Auto-calculate SL/TP points (in pips) whenever entry/SL/TP or symbol changes
-  useEffect(() => {
-    try {
-      const entry = parseFloat(formData.entry_price || '0');
-      if (!formData.entry_price || isNaN(entry)) return;
-
-      if (formData.stop_loss_price) {
-        const sl = parseFloat(formData.stop_loss_price || '0');
-        if (!isNaN(sl)) {
-          const computed = Math.round(calculatePointsFromPrice(entry, sl, formData.symbol));
-          // only update if different to avoid rerenders
-          if (String(formData.stop_loss_points || '') !== String(computed)) {
-            setFormData((f:any) => ({ ...f, stop_loss_points: String(computed) }));
-          }
-        }
-      }
-
-      if (formData.target_price) {
-        const tp = parseFloat(formData.target_price || '0');
-        if (!isNaN(tp)) {
-          const computedTp = Math.round(calculatePointsFromPrice(entry, tp, formData.symbol));
-          if (String(formData.target_points || '') !== String(computedTp)) {
-            setFormData((f:any) => ({ ...f, target_points: String(computedTp) }));
-          }
-        }
-      }
-    } catch (e) {
-      // ignore
-    }
-  }, [formData.entry_price, formData.stop_loss_price, formData.target_price, formData.symbol]);
-
+  
   // Enhanced validation with comprehensive cross-field checks
   useEffect(() => {
     const errs: Record<string,string> = {};
@@ -453,7 +423,7 @@ export const AddJournalDialog = ({ open, onOpenChange, onSaved }: AddJournalDial
   setup: formData.setup_name || null,
         setup_rating: formData.setup_rating,
         execution_type: formData.execution_type,
-    entry_price: formData.entry_price ? Number(formData.entry_price) : null,
+    entry_price: formData.entry_price ? Number(formData.entry_price) : 0,
     stop_loss_price: formData.stop_loss_price ? Number(formData.stop_loss_price) : null,
     target_price: formData.target_price ? Number(formData.target_price) : null,
     // Calculate points using pip conversion based on symbol type
