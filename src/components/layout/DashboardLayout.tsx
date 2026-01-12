@@ -39,7 +39,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       {/* Desktop Sidebar: animate width/opacity instead of unmounting for smooth transitions */}
       <aside
         className={cn(
-          "hidden lg:block border-r border-border glass-strong transition-all duration-300 ease-in-out relative overflow-visible",
+          "hidden lg:block border-r border-border glass-strong transition-all duration-300 ease-in-out overflow-hidden fixed h-screen left-0 top-0",
           // only change width here; visual hiding of inner content is handled by the Sidebar `collapsed` prop
           sidebarOpen ? "w-64" : "w-0",
         )}
@@ -57,7 +57,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       </Sheet>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className={cn("flex-1 flex flex-col min-h-screen transition-all duration-300", sidebarOpen ? "lg:ml-64" : "lg:ml-0")}>
         {/* Mobile Menu Toggle Button */}
         <div className="lg:hidden p-3 sm:p-4 border-b border-border/50 bg-background/80 backdrop-blur-sm flex items-center gap-2">
           <Button
@@ -150,8 +150,10 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </div>
         </main>
 
-        {/* Footer */}
-        <Footer />
+        {/* Footer - Fixed at bottom */}
+        <div className="border-t border-border/50 bg-background/50 backdrop-blur-sm mt-auto">
+          <Footer />
+        </div>
       </div>
 
       {/* Modals removed from layout — content moved to landing page as transparent cards */}
