@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Image, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import supabase from "@/lib/supabase";
 import { ViewJournalDialog } from "@/components/modals/ViewJournalDialog";
@@ -452,6 +452,107 @@ const JournalDashboard: React.FC = () => {
   const [drilledMonth, setDrilledMonth] = useState<string | null>(null);
   const [openEntry, setOpenEntry] = useState<any | null>(null);
   const [mobileModalData, setMobileModalData] = useState<{ date: string; trades: number; pnl: number } | null>(null);
+  const [weekOffset, setWeekOffset] = useState(0); // For weekly chart navigation
+
+  // Helper function to get start of week (Monday)
+  const getWeekStart = (offset: number) => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+    const weekStart = new Date(now.setDate(diff));
+    weekStart.setDate(weekStart.getDate() + offset * 7);
+    return weekStart;
+  };
+
+  // Helper function to format week display
+  const formatWeekDisplay = (weekStart: Date) => {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const monthStart = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const monthEnd = weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${monthStart} - ${monthEnd}`;
+  };
+
+  // Helper to get day name from date
+  const getDayName = (date: Date) => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return days[date.getDay()];
+  };
+
+  // Calculate weekly data for current week
+  const getWeeklyData = useMemo(() => {
+    const weekStart = getWeekStart(weekOffset);
+    const weekData: Record<string, { day: string; date: string; pnl: number; trades: number; plannedRR: number; achievedRR: number }> = {};
+    
+    // Initialize all 7 days
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart);
+      date.setDate(date.getDate() + i);
+      const dateStr = formatDateKey(date);
+      const dayName = getDayName(date);
+      weekData[dateStr] = {
+        day: dayName,
+        date: dateStr,
+        pnl: 0,
+        trades: 0,
+        plannedRR: 0,
+        achievedRR: 0
+      };
+    }
+
+    // Populate with entry data
+    for (const entry of entries) {
+      const ts = entry.entry_at || entry.created_at || entry.executed_at;
+      if (!ts) continue;
+      const dateStr = formatDateKey(ts);
+      
+      if (weekData[dateStr]) {
+        weekData[dateStr].pnl += Number(entry.realized_amount ?? 0);
+        weekData[dateStr].trades += 1;
+        
+        // Calculate RR metrics
+        const riskAmount = Number(entry.risk_amount || 0);
+        const profitTarget = Number(entry.profit_target || 0);
+        if (riskAmount > 0 && profitTarget > 0) {
+          weekData[dateStr].plannedRR += profitTarget / riskAmount;
+        }
+        
+        // Achieved RR based on result
+        if (entry.result === 'TP' && profitTarget > 0 && riskAmount > 0) {
+          weekData[dateStr].achievedRR += profitTarget / riskAmount;
+        } else if (entry.result === 'SL' && riskAmount > 0) {
+          weekData[dateStr].achievedRR -= 1;
+        }
+      }
+    }
+
+    return Object.values(weekData);
+  }, [entries, weekOffset]);
+
+  // Profit consistency data per day
+  const getProfitConsistencyData = useMemo(() => {
+    const weekStart = getWeekStart(weekOffset);
+    const weekData: Record<string, { day: string; pnl: number }> = {};
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart);
+      date.setDate(date.getDate() + i);
+      const dateStr = formatDateKey(date);
+      const dayName = getDayName(date);
+      weekData[dateStr] = { day: dayName, pnl: 0 };
+    }
+
+    for (const entry of entries) {
+      const ts = entry.entry_at || entry.created_at || entry.executed_at;
+      if (!ts) continue;
+      const dateStr = formatDateKey(ts);
+      if (weekData[dateStr]) {
+        weekData[dateStr].pnl += Number(entry.realized_amount ?? 0);
+      }
+    }
+
+    return Object.values(weekData);
+  }, [entries, weekOffset]);
 
   // Fetch journals
   useEffect(() => {
@@ -843,106 +944,98 @@ const JournalDashboard: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-2">
             <div>
               <h3 className="text-sm sm:text-base font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                Profit Consistency Chart
+                Weekly Profit Consistency
               </h3>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Cumulative daily gains/losses over time</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Daily P&L by day of week</p>
             </div>
-            <Badge className="bg-gradient-to-r from-teal-500/20 to-cyan-500/20 border border-teal-500/40 text-teal-300 text-xs">
-              Daily Cumulative
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-gradient-to-r from-teal-500/20 to-cyan-500/20 border border-teal-500/40 text-teal-300 text-xs">
+                {formatWeekDisplay(getWeekStart(weekOffset))}
+              </Badge>
+            </div>
           </div>
-          <div className="border border-teal-500/20 rounded-xl p-2 sm:p-4 bg-gradient-to-b from-slate-800/30 via-slate-900/20 to-background/40 backdrop-blur-sm hover:border-teal-500/30 transition-colors duration-200" style={{ height: 320 }}>
-            {entries.length < 2 ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
-                <div className="text-3xl"></div>
-                <p className="font-semibold">Minimum 2 trades required</p>
-                <p className="text-xs">Log at least 2 trades to see your profit consistency chart</p>
-              </div>
-            ) : (
-              (() => {
-                const map: Record<string, number> = {};
-                for (const e of entries) {
-                  const ts = e.entry_at || e.created_at || e.executed_at;
-                  if (!ts) continue;
-                  const key = formatDateKey(ts);
-                  map[key] = (map[key] || 0) + Number(e.realized_amount || 0);
-                }
-                const days = Object.keys(map).sort();
-                let cum = 0;
-                const data = days.map(d => {
-                  cum += map[d];
-                  return { date: d, cum, daily: map[d] };
-                });
 
-                return data.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={data} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="colorCumGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#0891b2" stopOpacity={0.1} />
-                      </linearGradient>
-                      <linearGradient id="shadowGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="rgba(20, 184, 166, 0.3)" />
-                        <stop offset="100%" stopColor="rgba(20, 184, 166, 0)" />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.15)" opacity={0.4} />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="rgb(148, 163, 184)" 
-                      style={{ fontSize: '11px' }}
-                      tick={{ fill: 'rgb(148, 163, 184)' }}
-                    />
-                    <YAxis 
-                      stroke="rgb(148, 163, 184)" 
-                      style={{ fontSize: '11px' }}
-                      tick={{ fill: 'rgb(148, 163, 184)' }}
-                    />
-                    <Tooltip
-                      contentStyle={{ 
-                        backgroundColor: "rgba(15, 23, 42, 0.95)", 
-                        border: "2px solid rgb(20, 184, 166)", 
-                        borderRadius: "10px",
-                        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)"
-                      }}
-                      formatter={(value: any, name: any) => {
-                        if (name === 'cum') return [`$${Number(value).toFixed(2)}`, 'Cumulative P&L'];
-                        return [`$${Number(value).toFixed(2)}`, 'Daily'];
-                      }}
-                      labelFormatter={(label) => `${label}`}
-                      cursor={{ stroke: 'rgba(20, 184, 166, 0.5)', strokeWidth: 2 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="cum"
-                      stroke="rgb(20, 184, 166)"
-                      strokeWidth={3}
-                      dot={{ fill: 'rgb(20, 184, 166)', r: 4, opacity: 0.7 }}
-                      activeDot={{ r: 6, fill: 'rgb(6, 182, 212)' }}
-                      isAnimationActive={true}
-                      animationDuration={1000}
-                      fillOpacity={1}
-                      fill="url(#shadowGradient)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
-                  <div className="text-3xl">📊</div>
-                  <p>No trades yet. Start logging trades to see your profit consistency!</p>
-                </div>
-              );
-              })()
+          {/* Week Navigation */}
+          <div className="flex justify-between items-center mb-4">
+            <button
+              onClick={() => setWeekOffset(w => w - 1)}
+              className="p-2 rounded-lg hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 transition-all"
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-medium text-muted-foreground">
+              {formatWeekDisplay(getWeekStart(weekOffset))}
+            </span>
+            <button
+              onClick={() => setWeekOffset(w => w + 1)}
+              className="p-2 rounded-lg hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 transition-all"
+              aria-label="Next week"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="border border-teal-500/20 rounded-xl p-2 sm:p-4 bg-gradient-to-b from-slate-800/30 via-slate-900/20 to-background/40 backdrop-blur-sm hover:border-teal-500/30 transition-colors duration-200" style={{ height: 320 }}>
+            {getProfitConsistencyData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={getProfitConsistencyData} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="barGainGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.8} />
+                      <stop offset="100%" stopColor="#0891b2" stopOpacity={0.4} />
+                    </linearGradient>
+                    <linearGradient id="barLossGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#ef4444" stopOpacity={0.8} />
+                      <stop offset="100%" stopColor="#dc2626" stopOpacity={0.4} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.15)" opacity={0.4} />
+                  <XAxis 
+                    dataKey="day" 
+                    stroke="rgb(148, 163, 184)" 
+                    style={{ fontSize: '11px' }}
+                    tick={{ fill: 'rgb(148, 163, 184)' }}
+                  />
+                  <YAxis 
+                    stroke="rgb(148, 163, 184)" 
+                    style={{ fontSize: '11px' }}
+                    tick={{ fill: 'rgb(148, 163, 184)' }}
+                  />
+                  <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: "rgba(15, 23, 42, 0.95)", 
+                      border: "2px solid rgb(20, 184, 166)", 
+                      borderRadius: "10px",
+                      boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)"
+                    }}
+                    formatter={(value: any) => `$${Number(value).toFixed(2)}`}
+                    cursor={{ fill: 'rgba(20, 184, 166, 0.1)' }}
+                  />
+                  <Bar
+                    dataKey="pnl"
+                    fill="url(#barGainGradient)"
+                    radius={[8, 8, 0, 0]}
+                    isAnimationActive={true}
+                    animationDuration={1000}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
+                <div className="text-3xl">📊</div>
+                <p>No trades this week yet. Start logging trades!</p>
+              </div>
             )}
           </div>
+
           <div className="mt-3 sm:mt-4 flex flex-wrap gap-2 text-xs sm:text-sm">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20">
               <div className="w-2 h-2 rounded-full bg-teal-400"></div>
-              <span>Cumulative P&L</span>
+              <span>Daily P&L (Single Bar)</span>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700/20 border border-slate-600/30">
-              <span className="text-xs">Tip: Click on points to see daily details</span>
+              <span className="text-xs">Use arrows to view other weeks</span>
             </div>
           </div>
         </Card>

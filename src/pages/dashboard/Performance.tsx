@@ -6,7 +6,7 @@ import { useAdmin } from '@/lib/AdminContext'
 import supabase from '@/lib/supabase'
 import { motion } from 'framer-motion'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { TrendingUp, TrendingDown, Target, AlertCircle, Zap, Lightbulb, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Target, AlertCircle, Zap, Lightbulb, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 import UnderDevelopment from '@/components/UnderDevelopment'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import WeekdayAnalysisSection from '../../components/WeekdayAnalysisSection'
@@ -107,6 +107,7 @@ const Performance = () => {
   const [selectedSetup, setSelectedSetup] = useState<string>('')
   const [availableSetups, setAvailableSetups] = useState<string[]>([])
   const [targetProfit, setTargetProfit] = useState<number | string>('')
+  const [weekOffset, setWeekOffset] = useState(0)
 
   useEffect(() => {
     let mounted = true
@@ -344,6 +345,84 @@ const Performance = () => {
     })()
     return () => { mounted = false }
   }, [user])
+
+  // Helper function to get the start of the week (Monday) for a given offset
+  const getWeekStart = (offset: number) => {
+    const now = new Date()
+    const day = now.getDay()
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1) // Adjust when day is Sunday
+    const weekStart = new Date(now.setDate(diff))
+    weekStart.setDate(weekStart.getDate() + offset * 7)
+    weekStart.setHours(0, 0, 0, 0)
+    return weekStart
+  }
+
+  // Helper function to format week display
+  const formatWeekDisplay = (weekStart: Date) => {
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekEnd.getDate() + 6)
+    const monthStart = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const monthEnd = weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return `${monthStart} - ${monthEnd}`
+  }
+
+  // Helper function to get day name
+  const getDayName = (date: Date) => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    return days[date.getDay()]
+  }
+
+  // Memoized calculation for weekly RR comparison data
+  const getWeeklyRRData = useMemo(() => {
+    const weekStart = getWeekStart(weekOffset)
+    const weekData: { [key: string]: any } = {}
+
+    // Initialize 7 days
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart)
+      date.setDate(date.getDate() + i)
+      const dateKey = date.toISOString().split('T')[0]
+      weekData[dateKey] = {
+        date: dateKey,
+        day: getDayName(date),
+        plannedRR: 0,
+        achievedRR: 0,
+        trades: 0
+      }
+    }
+
+    // Populate with entry data
+    entries.forEach((entry: any) => {
+      const entryDate = new Date(entry.trade_date || new Date())
+      entryDate.setHours(0, 0, 0, 0)
+      const dateKey = entryDate.toISOString().split('T')[0]
+
+      if (weekData[dateKey]) {
+        const riskAmount = Number(entry.risk_amount || 0)
+        const profitTarget = Number(entry.profit_target || 0)
+        const realizedAmount = Number(entry.realized_amount || 0)
+        
+        // Calculate planned RR
+        if (riskAmount > 0) {
+          weekData[dateKey].plannedRR += profitTarget / riskAmount
+        }
+        
+        // Calculate achieved RR
+        if (riskAmount > 0) {
+          weekData[dateKey].achievedRR += realizedAmount / riskAmount
+        }
+        
+        weekData[dateKey].trades += 1
+      }
+    })
+
+    // Average the RR values by dividing by trades count
+    return Object.values(weekData).map((day: any) => ({
+      ...day,
+      plannedRR: day.trades > 0 ? day.plannedRR / day.trades : 0,
+      achievedRR: day.trades > 0 ? day.achievedRR / day.trades : 0
+    }))
+  }, [entries, weekOffset])
 
   return (
     <div className="space-y-6 sm:space-y-8 overflow-x-hidden w-full max-w-full">
@@ -683,96 +762,96 @@ const Performance = () => {
                   <Card className="p-3 sm:p-4 md:p-5 lg:p-6 border border-blue-500/30 shadow-lg hover:shadow-2xl hover:border-blue-500/50 transition-all duration-300 bg-gradient-to-br from-blue-500/5 via-slate-900/20 to-background relative overflow-hidden w-full">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-3xl -z-10" />
                     
-                    <div className="flex flex-col gap-2 sm:gap-3">
+                    <div className="flex flex-col gap-2 sm:gap-3 mb-4">
                       <div>
-                        <p className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider">RR Comparison</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 sm:mt-1">Planned vs Achieved RR on each trade</p>
+                        <p className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider">Weekly RR Comparison</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 sm:mt-1">Planned vs Achieved RR by day of week</p>
+                      </div>
+                      
+                      {/* Week Navigation */}
+                      <div className="flex items-center justify-between gap-2 mt-2">
+                        <button
+                          onClick={() => setWeekOffset(weekOffset - 1)}
+                          className="p-1.5 rounded-lg hover:bg-blue-500/20 transition-colors text-blue-400 hover:text-blue-300"
+                          title="Previous week"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-xs sm:text-sm font-semibold text-blue-300 min-w-[160px] text-center">
+                          {formatWeekDisplay(getWeekStart(weekOffset))}
+                        </span>
+                        <button
+                          onClick={() => setWeekOffset(weekOffset + 1)}
+                          className="p-1.5 rounded-lg hover:bg-blue-500/20 transition-colors text-blue-400 hover:text-blue-300"
+                          title="Next week"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                     
-                    <div style={{ height: 250, width: '100%' }} className="overflow-x-auto mt-2 sm:mt-3">
+                    <div style={{ height: 280, width: '100%' }} className="overflow-x-auto mt-3">
                       {entries.length >= 2 ? (
-                        <div style={{ width: '100%', height: 250 }} className="overflow-x-hidden">
-                        <ResponsiveContainer width="100%" height={280}>
-                          <LineChart data={rrData.slice(-20)}>
-                            <defs>
-                              <linearGradient id="rrTargetLineGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity={0.3}/>
-                                <stop offset="100%" stopColor="rgb(34, 197, 94)" stopOpacity={0.01}/>
-                              </linearGradient>
-                              <linearGradient id="rrAchievedLineGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="rgb(6, 182, 212)" stopOpacity={0.3}/>
-                                <stop offset="100%" stopColor="rgb(6, 182, 212)" stopOpacity={0.01}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.15} vertical={false} />
-                            <XAxis 
-                              dataKey="name" 
-                              stroke="hsl(var(--muted-foreground))" 
-                              style={{ fontSize: '9px' }} 
-                              opacity={0.6}
-                              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }}
-                              interval={Math.ceil(rrData.length / 5)}
-                              angle={-45}
-                              textAnchor="end"
-                              height={40}
-                            />
-                            <YAxis 
-                              stroke="hsl(var(--muted-foreground))" 
-                              style={{ fontSize: '11px' }} 
-                              opacity={0.6}
-                              domain={[0, Math.max(5, ...(rrData.map((d:any) => Math.max(d.target || 0, d.achieved || 0)) ?? [0]))]}
-                              tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                            />
-                            <Tooltip 
-                              contentStyle={{ 
-                                backgroundColor: "hsl(var(--card))", 
-                                border: "2px solid rgb(6, 182, 212)",
-                                borderRadius: '10px',
-                                boxShadow: '0 10px 30px rgba(6, 182, 212, 0.2)'
-                              }}
-                              formatter={(value: any, name: string) => {
-                                const label = name === 'target' ? 'Planned RR' : 'Achieved RR'
-                                return [value.toFixed(2), label]
-                              }}
-                              labelFormatter={(label) => `Trade ${label}`}
-                              cursor={{ stroke: 'rgba(6, 182, 212, 0.3)', strokeWidth: 2 }}
-                            />
-                            <Legend 
-                              wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }}
-                              iconType="line"
-                              layout="vertical"
-                              align="right"
-                              verticalAlign="middle"
-                              formatter={(value) => value === 'target' ? 'Planned' : 'Achieved'}
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="target" 
-                              stroke="rgb(34, 197, 94)" 
-                              strokeWidth={3}
-                              dot={{ fill: 'rgb(34, 197, 94)', r: 4, opacity: 0.7 }}
-                              activeDot={{ r: 6, fill: 'rgb(34, 197, 94)' }}
-                              fill="url(#rrTargetLineGradient)"
-                              isAnimationActive={true}
-                              animationDuration={800}
-                              name="target"
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="achieved" 
-                              stroke="rgb(6, 182, 212)" 
-                              strokeWidth={3}
-                              dot={{ fill: 'rgb(6, 182, 212)', r: 4, opacity: 0.7 }}
-                              activeDot={{ r: 6, fill: 'rgb(6, 182, 212)' }}
-                              fill="url(#rrAchievedLineGradient)"
-                              isAnimationActive={true}
-                              animationDuration={800}
-                              name="achieved"
-                              strokeDasharray="5 5"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                        <div style={{ width: '100%', height: 280 }} className="overflow-x-hidden">
+                          <ResponsiveContainer width="100%" height={280}>
+                            <BarChart data={getWeeklyRRData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                              <defs>
+                                <linearGradient id="rrPlannedGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity={0.8}/>
+                                  <stop offset="100%" stopColor="rgb(34, 197, 94)" stopOpacity={0.4}/>
+                                </linearGradient>
+                                <linearGradient id="rrAchievedGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="rgb(6, 182, 212)" stopOpacity={0.8}/>
+                                  <stop offset="100%" stopColor="rgb(6, 182, 212)" stopOpacity={0.4}/>
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.15} vertical={false} />
+                              <XAxis 
+                                dataKey="day" 
+                                stroke="hsl(var(--muted-foreground))" 
+                                style={{ fontSize: '11px' }} 
+                                opacity={0.6}
+                                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                              />
+                              <YAxis 
+                                stroke="hsl(var(--muted-foreground))" 
+                                style={{ fontSize: '11px' }} 
+                                opacity={0.6}
+                                tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                                label={{ value: 'RR Ratio', angle: -90, position: 'insideLeft', style: { fontSize: 11, opacity: 0.6 } }}
+                              />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: "hsl(var(--card))", 
+                                  border: "2px solid rgb(6, 182, 212)",
+                                  borderRadius: '10px',
+                                  boxShadow: '0 10px 30px rgba(6, 182, 212, 0.2)'
+                                }}
+                                formatter={(value: any) => [value.toFixed(2), '']}
+                                labelFormatter={(label) => `${label}`}
+                                cursor={{ fill: 'rgba(6, 182, 212, 0.1)' }}
+                              />
+                              <Legend 
+                                wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }}
+                                iconType="rect"
+                                formatter={(value) => value === 'plannedRR' ? 'Planned RR' : 'Achieved RR'}
+                              />
+                              <Bar 
+                                dataKey="plannedRR" 
+                                fill="url(#rrPlannedGradient)"
+                                radius={[4, 4, 0, 0]}
+                                animationDuration={600}
+                                name="plannedRR"
+                              />
+                              <Bar 
+                                dataKey="achievedRR" 
+                                fill="url(#rrAchievedGradient)"
+                                radius={[4, 4, 0, 0]}
+                                animationDuration={600}
+                                name="achievedRR"
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
                         </div>
                       ) : (
                         <motion.div 
