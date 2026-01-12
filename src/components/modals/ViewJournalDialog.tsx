@@ -8,9 +8,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, ExternalLink } from "lucide-react";
+import { Download, ExternalLink, Info } from "lucide-react";
 import { formatRealizedEntry } from "@/lib/display-utils";
 import { useModalBackButton } from "@/hooks/useModalBackButton";
+import { useState } from "react";
 
 const scrollHideStyles = `
   .view-dialog-scroll::-webkit-scrollbar {
@@ -31,6 +32,8 @@ interface ViewJournalDialogProps {
 export const ViewJournalDialog = ({ open, onOpenChange, entry }: ViewJournalDialogProps) => {
   // Handle back button to close modal instead of navigating
   useModalBackButton(open, () => onOpenChange(false));
+  const [showSetupDetails, setShowSetupDetails] = useState(false);
+  
   if (!entry) return null;
 
   const timestamp = entry.entry_at || entry.executed_at || entry.created_at;
@@ -38,16 +41,6 @@ export const ViewJournalDialog = ({ open, onOpenChange, entry }: ViewJournalDial
   const realized = Number(entry.realized_amount ?? entry.realized_points ?? 0);
   const isWin = realized > 0;
   const isLoss = realized < 0;
-
-  // Format duration from minutes to readable format (e.g., "2h 30m")
-  const formatDuration = (minutes: number) => {
-    if (!minutes || minutes <= 0) return '—';
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
-  };
 
   return (
     <>
@@ -71,44 +64,64 @@ export const ViewJournalDialog = ({ open, onOpenChange, entry }: ViewJournalDial
 
           <div className="max-h-[calc(90vh-150px)] overflow-y-auto view-dialog-scroll space-y-3 sm:space-y-4 pr-3">
           
-          {/* Cards Left + Screenshots Right Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Left Side - Key Metrics Cards (2 per row) */}
-            <div className="grid grid-cols-2 gap-2">
-              <Card className="p-2 sm:p-3 bg-background/40 border-border/30">
-                <p className="text-xs text-muted-foreground font-medium">Direction</p>
-                <p className="text-xs sm:text-sm font-bold mt-1">{entry.direction || '—'}</p>
-              </Card>
-              <Card className="p-2 sm:p-3 bg-background/40 border-border/30">
-                <p className="text-xs text-muted-foreground font-medium">Session</p>
-                <p className="text-xs sm:text-sm font-bold mt-1">{entry.session || '—'}</p>
-              </Card>
-              <Card className="p-2 sm:p-3 bg-background/40 border-border/30">
-                <p className="text-xs text-muted-foreground font-medium">Setup</p>
-                <p className="text-xs font-bold mt-1 line-clamp-2">{Array.isArray(entry.setup) ? entry.setup.join(', ') : (entry.setup || '—')}</p>
-              </Card>
-              <Card className="p-2 sm:p-3 bg-background/40 border-border/30">
-                <p className="text-xs text-muted-foreground font-medium">Duration</p>
-                <p className="text-xs sm:text-sm font-bold mt-1">{formatDuration(entry.duration_minutes)}</p>
-              </Card>
-              <Card className="p-2 sm:p-3 bg-background/40 border-border/30">
-                <p className="text-xs text-muted-foreground font-medium">Result</p>
-                <p className="text-xs sm:text-sm font-bold mt-1">{entry.result || '—'}</p>
-              </Card>
-              <Card className={`p-2 sm:p-3 border-border/30 ${isWin ? 'bg-emerald-500/10 border-emerald-500/30' : isLoss ? 'bg-rose-500/10 border-rose-500/30' : 'bg-background/40'}`}>
-                <p className="text-xs text-muted-foreground font-medium">P&L</p>
-                <p className={`text-xs sm:text-sm font-bold mt-1 ${isWin ? 'text-emerald-400' : isLoss ? 'text-rose-400' : 'text-foreground'}`}>
-                  {isWin && '💰 '}{isLoss && '📉 '}{formatRealizedEntry(entry)}
-                </p>
-              </Card>
-            </div>
+          {/* Top Row - Metrics Cards (1 per row on mobile, 2-3 per row on desktop) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+            <Card className="p-2 sm:p-3 bg-background/40 border-border/30">
+              <p className="text-xs text-muted-foreground font-medium">Direction</p>
+              <p className="text-xs sm:text-sm font-bold mt-1">{entry.direction || '—'}</p>
+            </Card>
+            <Card className="p-2 sm:p-3 bg-background/40 border-border/30">
+              <p className="text-xs text-muted-foreground font-medium">Session</p>
+              <p className="text-xs sm:text-sm font-bold mt-1">{entry.session || '—'}</p>
+            </Card>
+            <Card className="p-2 sm:p-3 bg-background/40 border-border/30">
+              <p className="text-xs text-muted-foreground font-medium">Result</p>
+              <p className="text-xs sm:text-sm font-bold mt-1">{entry.result || '—'}</p>
+            </Card>
+          </div>
 
-            {/* Right Side - Screenshots */}
+          {/* Setup Card - Full Width with Clickable Details */}
+          <button
+            onClick={() => setShowSetupDetails(!showSetupDetails)}
+            className="w-full text-left"
+          >
+            <Card className="p-2 sm:p-3 bg-background/40 border-border/30 hover:border-accent/50 transition-colors cursor-pointer">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground font-medium">Setup</p>
+                  <p className="text-xs sm:text-sm font-bold mt-1 truncate">{Array.isArray(entry.setup) ? entry.setup.join(', ') : (entry.setup || '—')}</p>
+                </div>
+                <Info className="w-4 h-4 text-accent flex-shrink-0 mt-1" />
+              </div>
+            </Card>
+          </button>
+
+          {/* Setup Details Expandable Section */}
+          {showSetupDetails && entry.setup && (
+            <Card className="p-3 sm:p-4 bg-accent/5 border border-accent/20">
+              <p className="text-xs sm:text-sm font-semibold text-accent mb-2">Setup Details</p>
+              <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                {typeof entry.setup === 'string' ? entry.setup : Array.isArray(entry.setup) ? entry.setup.join('\n') : '—'}
+              </p>
+            </Card>
+          )}
+
+          {/* P&L Card - Full Width */}
+          <Card className={`p-2 sm:p-3 border-border/30 ${isWin ? 'bg-emerald-500/10 border-emerald-500/30' : isLoss ? 'bg-rose-500/10 border-rose-500/30' : 'bg-background/40'}`}>
+            <p className="text-xs text-muted-foreground font-medium">P&L Result</p>
+            <p className={`text-lg sm:text-2xl font-bold mt-2 ${isWin ? 'text-emerald-400' : isLoss ? 'text-rose-400' : 'text-foreground'}`}>
+              {isWin && '💰 '}{isLoss && '📉 '}{formatRealizedEntry(entry)}
+            </p>
+          </Card>
+
+          {/* Evidence & Notes Side by Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Evidence Section */}
             <div>
-              <p className="text-xs sm:text-sm font-semibold text-accent mb-2">📸 Screenshots</p>
+              <p className="text-xs sm:text-sm font-semibold text-accent mb-2">📸 Evidence</p>
               {(!entry.screenshot_urls || entry.screenshot_urls.length === 0) ? (
-                <Card className="p-4 sm:p-6 bg-background/40 border-border/30 flex items-center justify-center min-h-[150px]">
-                  <p className="text-xs sm:text-sm text-muted-foreground">No screenshots attached</p>
+                <Card className="p-4 sm:p-6 bg-background/40 border-border/30 flex items-center justify-center min-h-[120px]">
+                  <p className="text-xs sm:text-sm text-muted-foreground">No evidence attached</p>
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 gap-2 sm:gap-3">
@@ -117,8 +130,8 @@ export const ViewJournalDialog = ({ open, onOpenChange, entry }: ViewJournalDial
                       <div className="relative group cursor-pointer">
                         <img 
                           src={url} 
-                          alt={`Screenshot ${idx + 1}`} 
-                          className="w-full h-48 sm:h-56 object-cover rounded transition-transform group-hover:scale-105"
+                          alt={`Evidence ${idx + 1}`} 
+                          className="w-full h-36 sm:h-44 object-cover rounded transition-transform group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors rounded flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                           <a 
@@ -143,24 +156,23 @@ export const ViewJournalDialog = ({ open, onOpenChange, entry }: ViewJournalDial
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Trade Details Section */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {/* Empty or future details can go here */}
-          </div>
-
-          {/* Notes Section */}
-          {entry.notes && (
+            {/* Notes Section */}
             <div>
-              <p className="text-xs sm:text-sm font-semibold text-accent mb-2">📝 Notes</p>
-              <Card className="p-3 sm:p-4 bg-background/40 border-border/30">
-                <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                  {entry.notes}
-                </p>
-              </Card>
+              <p className="text-xs sm:text-sm font-semibold text-accent mb-2">📝 Trade Notes</p>
+              {entry.notes ? (
+                <Card className="p-3 sm:p-4 bg-background/40 border-border/30 min-h-[120px]">
+                  <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                    {entry.notes}
+                  </p>
+                </Card>
+              ) : (
+                <Card className="p-3 sm:p-4 bg-background/40 border-border/30 min-h-[120px] flex items-center justify-center">
+                  <p className="text-xs sm:text-sm text-muted-foreground italic">No notes added</p>
+                </Card>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Loss Reason (if applicable) */}
           {entry.loss_reason && (

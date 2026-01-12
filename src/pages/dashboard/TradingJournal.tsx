@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Plus, Edit, Image } from "lucide-react";
+import { Plus, Edit, Image, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AddJournalDialog } from "@/components/modals/AddJournalDialog";
 import { EditJournalDialog } from "@/components/modals/EditJournalDialog";
@@ -13,14 +13,28 @@ import { formatRealizedEntry, formatRealizedValue } from "@/lib/display-utils";
 import supabase from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthProvider";
 import { useMemo } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const TradingJournal = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [openAdd, setOpenAdd] = useState(false);
   const [editEntry, setEditEntry] = useState<any | null>(null);
   const [viewEntry, setViewEntry] = useState<any | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -119,6 +133,102 @@ const TradingJournal = () => {
     return () => { mounted = false; };
   }, [user, location.search, search]);
 
+  const handleDeleteJournal = async (entry: any) => {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('journals')
+        .delete()
+        .eq('id', entry.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Remove from local state
+      setEntries(entries.filter(e => e.id !== entry.id));
+      setSelectedIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(entry.id);
+        return updated;
+      });
+      setDeleteConfirm(null);
+      toast({
+        title: "Success",
+        description: "Journal entry deleted successfully"
+      });
+    } catch (error: any) {
+      console.error('Error deleting journal:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete journal entry",
+        variant: "destructive"
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!user || selectedIds.size === 0) return;
+    setDeleting(true);
+    try {
+      const idsArray = Array.from(selectedIds);
+      const { error } = await supabase
+        .from('journals')
+        .delete()
+        .in('id', idsArray)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Remove from local state
+      setEntries(entries.filter(e => !selectedIds.has(e.id)));
+      setSelectedIds(new Set());
+      setDeleteConfirm(null);
+      toast({
+        title: "Success",
+        description: `${idsArray.length} journal ${idsArray.length === 1 ? 'entry' : 'entries'} deleted successfully`
+      });
+    } catch (error: any) {
+      console.error('Error deleting journals:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete journal entries",
+        variant: "destructive"
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const toggleSelectEntry = (id: string) => {
+    setSelectedIds(prev => {
+      const updated = new Set(prev);
+      if (updated.has(id)) {
+        updated.delete(id);
+      } else {
+        updated.add(id);
+      }
+      return updated;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * pageSize;
+    const pageItems = entries.slice(start, start + pageSize);
+    
+    if (selectedIds.size === pageItems.length && pageItems.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      const newSelected = new Set(selectedIds);
+      pageItems.forEach(e => newSelected.add(e.id));
+      setSelectedIds(newSelected);
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col min-h-screen">
@@ -154,14 +264,24 @@ const TradingJournal = () => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.15, duration: 0.3 }}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto flex gap-2"
             >
               <Button 
                 onClick={() => setOpenAdd(true)} 
-                className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 shadow-lg hover:shadow-xl transition-all duration-200 text-white font-semibold px-4 sm:px-6 text-sm sm:text-base"
+                className="flex-1 sm:flex-none bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 shadow-lg hover:shadow-xl transition-all duration-200 text-white font-semibold px-4 sm:px-6 text-sm sm:text-base"
               >
                 <Plus className="mr-2 w-4 sm:w-5 h-4 sm:h-5" /> Add Entry
               </Button>
+              {selectedIds.size > 0 && (
+                <Button 
+                  onClick={() => setDeleteConfirm({ bulk: true, count: selectedIds.size })}
+                  variant="destructive"
+                  className="flex-1 sm:flex-none shadow-lg hover:shadow-xl transition-all duration-200 font-semibold px-4 sm:px-6 text-sm sm:text-base"
+                >
+                  <Trash2 className="mr-2 w-4 sm:w-5 h-4 sm:h-5" /> 
+                  Delete {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
+                </Button>
+              )}
             </motion.div>
           </div>
         </div>
@@ -259,6 +379,15 @@ const TradingJournal = () => {
           <table className="w-full text-sm table-fixed">
             <thead>
               <tr className="text-xs text-muted-foreground border-b border-border/50 bg-gradient-to-r from-accent/5 to-transparent sticky top-0 z-10">
+                <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-center font-semibold whitespace-nowrap text-xs sm:text-sm w-8">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size > 0 && selectedIds.size === entries.slice((Math.min(page, Math.max(1, Math.ceil(entries.length / pageSize))) - 1) * pageSize, (Math.min(page, Math.max(1, Math.ceil(entries.length / pageSize))) - 1) * pageSize + pageSize).length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 cursor-pointer"
+                    title="Select all entries on this page"
+                  />
+                </th>
                 <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-left font-semibold whitespace-nowrap text-xs sm:text-sm">Date</th>
                 <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-left font-semibold whitespace-nowrap text-xs sm:text-sm">Symbol</th>
                 <th className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-left font-semibold whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm">Direction</th>
@@ -303,11 +432,22 @@ const TradingJournal = () => {
                   return (
                     <motion.tr 
                       key={e.id} 
-                      className="hover:bg-accent/10 transition-all duration-150 group"
+                      className={`hover:bg-accent/10 transition-all duration-150 group ${selectedIds.has(e.id) ? 'bg-accent/20' : ''}`}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.2 }}
                     >
+                      {/* Checkbox */}
+                      <td className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-center w-8">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(e.id)}
+                          onChange={() => toggleSelectEntry(e.id)}
+                          className="w-4 h-4 cursor-pointer"
+                          title={`Select entry for ${e.symbol}`}
+                        />
+                      </td>
+                      
                       {/* Date */}
                       <td className="py-2 px-1.5 sm:py-3 sm:px-2 md:px-4 text-muted-foreground font-medium whitespace-nowrap text-xs sm:text-sm">
                         {timestamp ? (
@@ -495,6 +635,40 @@ const TradingJournal = () => {
       <EditJournalDialog open={!!editEntry} entry={editEntry} onOpenChange={(open) => { if (!open) setEditEntry(null) }} />
 
       <ViewJournalDialog open={!!viewEntry} entry={viewEntry} onOpenChange={(open) => { if (!open) setViewEntry(null) }} />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteConfirm?.bulk ? 'Delete Journal Entries' : 'Delete Journal Entry'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirm?.bulk ? (
+                <>
+                  Are you sure you want to delete <span className="font-semibold text-foreground">{deleteConfirm?.count}</span> journal {deleteConfirm?.count === 1 ? 'entry' : 'entries'}? 
+                  All associated data including trade details, notes, and evidence will be permanently removed. This action cannot be undone.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to delete this journal entry for <span className="font-semibold text-foreground">{deleteConfirm?.symbol}</span>? 
+                  All associated data including trade details, notes, and evidence will be permanently removed. This action cannot be undone.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2 justify-end">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirm?.bulk ? handleBulkDelete() : handleDeleteJournal(deleteConfirm)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : deleteConfirm?.bulk ? `Delete ${deleteConfirm?.count} Entries` : "Delete Entry"}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
       </div>
       </div>
     </>

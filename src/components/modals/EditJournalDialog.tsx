@@ -45,15 +45,12 @@ export const EditJournalDialog = ({ open, onOpenChange, entry }: EditJournalDial
         session: entry.session ?? 'London',
         setup_name: entry.setup ?? '',
         execution_type: entry.execution_type ?? '',
-        stop_loss_points: entry.stop_loss_points ?? 0,
-        target_points: entry.target_points ?? 0,
         risk_amount: entry.risk_amount ?? 0,
         profit_target: entry.profit_target ?? 0,
         direction: entry.direction ?? 'Buy',
         result: entry.result ?? 'TP',
         manualOutcome: entry.manualOutcome ?? 'Profit',
         manualAmount: entry.manualAmount ?? 0,
-        duration_minutes: entry.duration_minutes ?? 0,
         notes: entry.notes ?? '',
         trade_date: entry.trade_date ?? new Date().toISOString().split('T')[0],
       })
@@ -111,8 +108,6 @@ export const EditJournalDialog = ({ open, onOpenChange, entry }: EditJournalDial
       try {
         if (!entry?.id) throw new Error('Missing entry id')
 
-        const stop = Number(form.stop_loss_points || 0)
-        const target = Number(form.target_points || 0)
         const riskAmount = Number(form.risk_amount || 0)
         const profitTarget = Number(form.profit_target || 0)
         
@@ -126,15 +121,12 @@ export const EditJournalDialog = ({ open, onOpenChange, entry }: EditJournalDial
           session: form.session,
           setup: form.setup_name,
           execution_type: form.execution_type,
-          stop_loss_points: stop || null,
-          target_points: target || null,
           risk_amount: riskAmount || null,
           profit_target: profitTarget || null,
           direction: form.direction,
           result: form.result,
           realized_amount: realized,
           win: form.result === 'MANUAL' ? (form.manualOutcome === 'Profit') : (form.result === 'TP'),
-          duration_minutes: Number(form.duration_minutes) || null,
           notes: form.notes || null,
           trade_date: form.trade_date || new Date().toISOString().split('T')[0],
           updated_at: new Date().toISOString(),
@@ -391,30 +383,6 @@ export const EditJournalDialog = ({ open, onOpenChange, entry }: EditJournalDial
               </div>
             )}
 
-            {/* Stop Loss and Target Points */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Stop Loss Points</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={form.stop_loss_points || 0}
-                  onChange={(e) => setForm((s: any) => ({ ...s, stop_loss_points: e.target.value }))}
-                  onWheel={preventNumberScroll}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Target Points</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={form.target_points || 0}
-                onChange={(e) => setForm((s: any) => ({ ...s, target_points: e.target.value }))}
-                onWheel={preventNumberScroll}
-                />
-              </div>
-            </div>
-
             {/* Risk Amount and Profit Target */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -437,17 +405,6 @@ export const EditJournalDialog = ({ open, onOpenChange, entry }: EditJournalDial
                   onWheel={preventNumberScroll}
                 />
               </div>
-            </div>
-
-            {/* Duration */}
-            <div className="space-y-2">
-              <Label>Duration (minutes)</Label>
-              <Input
-                type="number"
-                value={form.duration_minutes || 0}
-                onChange={(e) => setForm((s: any) => ({ ...s, duration_minutes: e.target.value }))}
-                onWheel={preventNumberScroll}
-              />
             </div>
 
             {/* Trade Date */}
