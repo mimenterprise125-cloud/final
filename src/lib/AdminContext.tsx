@@ -36,6 +36,7 @@ export interface AdminSettings {
   locked_sections: string[];
   community_links: SocialLink[];
   footer_social_links: SocialLink[];
+  toggle_visible: boolean;
 }
 
 export interface ErrorLog {
@@ -58,6 +59,7 @@ interface AdminContextType {
   togglePropFirmLock: () => Promise<void>;
   toggleJournalLock: () => Promise<void>;
   togglePerformanceAnalyticsLock: () => Promise<void>;
+  toggleToggleVisibility: () => Promise<void>;
   addErrorLog: (error: Omit<ErrorLog, 'id' | 'timestamp'>) => Promise<void>;
   clearErrorLogs: () => Promise<void>;
   updatePricingTiers: (tiers: PricingTier[]) => Promise<void>;
@@ -84,6 +86,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     locked_sections: [],
     community_links: [],
     footer_social_links: [],
+    toggle_visible: true,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -181,6 +184,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           locked_sections: data.locked_sections || [],
           community_links: data.community_links || [],
           footer_social_links: data.footer_social_links || [],
+          toggle_visible: data.toggle_visible !== false,
         });
       }
 
@@ -361,6 +365,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (updates.maintenance_mode !== undefined) dbUpdates.maintenance_mode = updates.maintenance_mode;
       if (updates.pricing_tiers !== undefined) dbUpdates.pricing_tiers = updates.pricing_tiers;
       if (updates.locked_sections !== undefined) dbUpdates.locked_sections = updates.locked_sections;
+      if (updates.toggle_visible !== undefined) dbUpdates.toggle_visible = updates.toggle_visible;
       
       dbUpdates.updated_at = new Date().toISOString();
 
@@ -416,6 +421,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const togglePerformanceAnalyticsLock = async () => {
     await updateSettings({
       performance_analytics_locked: !adminSettings.performance_analytics_locked,
+    });
+  };
+
+  const toggleToggleVisibility = async () => {
+    await updateSettings({
+      toggle_visible: !adminSettings.toggle_visible,
     });
   };
 
@@ -580,6 +591,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         togglePropFirmLock,
         toggleJournalLock,
         togglePerformanceAnalyticsLock,
+        toggleToggleVisibility,
         addErrorLog,
         clearErrorLogs,
         updatePricingTiers,

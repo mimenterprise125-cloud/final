@@ -31,7 +31,7 @@ type TabType = 'overview' | 'errors' | 'users' | 'pricing' | 'features' | 'maint
 const Admin = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { adminSettings, loading, error, updateSettings, toggleMaintenanceMode, togglePricingEnabled, togglePropFirmLock, toggleJournalLock, togglePerformanceAnalyticsLock, clearErrorLogs, updatePricingTiers, updateSocialLinks } = useAdmin();
+  const { adminSettings, loading, error, updateSettings, toggleMaintenanceMode, togglePricingEnabled, togglePropFirmLock, toggleJournalLock, togglePerformanceAnalyticsLock, toggleToggleVisibility, clearErrorLogs, updatePricingTiers, updateSocialLinks } = useAdmin();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showPricingForm, setShowPricingForm] = useState(false);
   const [pricingTiers, setPricingTiers] = useState(adminSettings.pricing_tiers);
@@ -638,6 +638,66 @@ const Admin = () => {
                         <>
                           <Lock className="mr-2 w-4 h-4" />
                           Lock This Section
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+              </motion.div>
+
+              {/* Toggle Visibility Card */}
+              <motion.div whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
+                <Card className={`relative overflow-hidden border-2 p-6 transition-all ${
+                  adminSettings.toggle_visible 
+                    ? 'bg-gradient-to-br from-purple-500/10 via-slate-800 to-slate-900 border-purple-500/30 shadow-lg shadow-purple-500/10' 
+                    : 'bg-gradient-to-br from-orange-500/10 via-slate-800 to-slate-900 border-orange-500/30 shadow-lg shadow-orange-500/10'
+                }`}>
+                  {!adminSettings.toggle_visible && (
+                    <div className="absolute top-2 right-2 text-xs px-3 py-1 rounded-full bg-orange-500/20 text-orange-300 font-semibold">
+                      🔒 Hidden
+                    </div>
+                  )}
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        {adminSettings.toggle_visible ? (
+                          <Eye className="w-5 h-5 text-purple-400" />
+                        ) : (
+                          <EyeOff className="w-5 h-5 text-orange-400" />
+                        )}
+                        <h3 className="text-xl font-bold text-white">Prop/Journal Toggle</h3>
+                      </div>
+                      <p className="text-gray-400 text-sm">
+                        {adminSettings.toggle_visible 
+                          ? 'Users can see the Prop Firms/Journal toggle button in the header' 
+                          : 'The Prop Firms/Journal toggle button is hidden from users'}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <Badge className={adminSettings.toggle_visible ? 'bg-purple-500/30 text-purple-300' : 'bg-orange-500/30 text-orange-300'}>
+                        {adminSettings.toggle_visible ? 'VISIBLE' : 'HIDDEN'}
+                      </Badge>
+                    </div>
+
+                    <Button
+                      onClick={() => toggleToggleVisibility()}
+                      className={`w-full font-semibold transition-all ${
+                        adminSettings.toggle_visible 
+                          ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                          : 'bg-purple-600 hover:bg-purple-700 text-white'
+                      }`}
+                    >
+                      {adminSettings.toggle_visible ? (
+                        <>
+                          <EyeOff className="mr-2 w-4 h-4" />
+                          Hide Toggle
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="mr-2 w-4 h-4" />
+                          Show Toggle
                         </>
                       )}
                     </Button>
