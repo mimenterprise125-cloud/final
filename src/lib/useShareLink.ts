@@ -107,39 +107,53 @@ export const useShareLink = () => {
   // Get a specific share link by token (public access)
   const getShareLinkByToken = async (token: string): Promise<ShareLink | null> => {
     setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('journal_share_links')
-        .select('*')
-        .eq('share_token', token)
-        .eq('is_active', true);
+    let retries = 3;
+    
+    while (retries > 0) {
+      try {
+        const { data, error } = await supabase
+          .from('journal_share_links')
+          .select('*')
+          .eq('share_token', token)
+          .eq('is_active', true);
 
-      if (error) {
-        console.error('Error fetching share link:', error);
-        return null;
+        if (error) {
+          console.error('Error fetching share link:', error);
+          retries--;
+          if (retries > 0) {
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
+          }
+          return null;
+        }
+
+        // Get first matching record (should only be one due to unique constraint)
+        if (!data || data.length === 0) {
+          console.log('No share link found for token:', token);
+          return null;
+        }
+
+        const shareLink = data[0];
+
+        // Check if link has expired
+        if (shareLink.expires_at && new Date(shareLink.expires_at) < new Date()) {
+          console.log('Share link has expired');
+          return null;
+        }
+
+        return shareLink;
+      } catch (error: any) {
+        console.error('Error fetching share link (attempt', 4 - retries + '):', error);
+        retries--;
+        if (retries > 0) {
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
-
-      // Get first matching record (should only be one due to unique constraint)
-      if (!data || data.length === 0) {
-        console.log('No share link found for token:', token);
-        return null;
-      }
-
-      const shareLink = data[0];
-
-      // Check if link has expired
-      if (shareLink.expires_at && new Date(shareLink.expires_at) < new Date()) {
-        console.log('Share link has expired');
-        return null;
-      }
-
-      return shareLink;
-    } catch (error: any) {
-      console.error('Error fetching share link:', error);
-      return null;
-    } finally {
-      setLoading(false);
     }
+    
+    return null;
   };
 
   // Update share link

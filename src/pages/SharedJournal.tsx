@@ -58,8 +58,14 @@ export default function SharedJournal() {
 
         const link = await getShareLinkByToken(token);
         
-        if (!link || !link.is_active) {
+        if (!link) {
           setError('This share link is no longer available');
+          setLoading(false);
+          return;
+        }
+
+        if (!link.is_active) {
+          setError('This share link has been disabled');
           setLoading(false);
           return;
         }
@@ -85,6 +91,7 @@ export default function SharedJournal() {
         }
 
         setTrades(data || []);
+        setError(null);
       } catch (err) {
         console.error('Error fetching shared journal:', err);
         setError('Failed to load shared journal');
@@ -94,7 +101,7 @@ export default function SharedJournal() {
     };
 
     fetchSharedJournal();
-  }, [token, getShareLinkByToken]);
+  }, [token]);
 
   const calculateStats = () => {
     if (trades.length === 0) return { total: 0, wins: 0, losses: 0, profit: 0, loss: 0 };
