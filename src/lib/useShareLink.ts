@@ -112,20 +112,28 @@ export const useShareLink = () => {
         .from('journal_share_links')
         .select('*')
         .eq('share_token', token)
-        .eq('is_active', true)
-        .single();
+        .eq('is_active', true);
 
       if (error) {
         console.error('Error fetching share link:', error);
         return null;
       }
 
-      // Check if link has expired
-      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      // Get first matching record (should only be one due to unique constraint)
+      if (!data || data.length === 0) {
+        console.log('No share link found for token:', token);
         return null;
       }
 
-      return data;
+      const shareLink = data[0];
+
+      // Check if link has expired
+      if (shareLink.expires_at && new Date(shareLink.expires_at) < new Date()) {
+        console.log('Share link has expired');
+        return null;
+      }
+
+      return shareLink;
     } catch (error: any) {
       console.error('Error fetching share link:', error);
       return null;
