@@ -31,6 +31,7 @@ import Admin from "./pages/Admin";
 import UnderMaintenance from "./pages/UnderMaintenance";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
+import SharedJournal from "./pages/SharedJournal";
 
 const queryClient = new QueryClient();
 
@@ -117,6 +118,7 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/shared-journal/:token" element={<SharedJournal />} />
 
           {/* OAuth Callback */}
           <Route path="/auth/callback" element={<AuthCallback />} />

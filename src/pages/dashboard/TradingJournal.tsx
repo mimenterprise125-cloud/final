@@ -4,11 +4,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Plus, Edit, Image, Trash2 } from "lucide-react";
+import { Plus, Edit, Image, Trash2, Share2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AddJournalDialog } from "@/components/modals/AddJournalDialog";
 import { EditJournalDialog } from "@/components/modals/EditJournalDialog";
 import { ViewJournalDialog } from "@/components/modals/ViewJournalDialog";
+import { ShareLinkManagementDialog } from "@/components/modals/ShareLinkManagementDialog";
 import { formatRealizedEntry, formatRealizedValue } from "@/lib/display-utils";
 import supabase from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthProvider";
@@ -30,6 +31,7 @@ const TradingJournal = () => {
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [openAdd, setOpenAdd] = useState(false);
+  const [openShare, setOpenShare] = useState(false);
   const [editEntry, setEditEntry] = useState<any | null>(null);
   const [viewEntry, setViewEntry] = useState<any | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<any | null>(null);
@@ -272,6 +274,12 @@ const TradingJournal = () => {
               >
                 <Plus className="mr-2 w-4 sm:w-5 h-4 sm:h-5" /> Add Entry
               </Button>
+              <Button 
+                onClick={() => setOpenShare(true)} 
+                className="flex-1 sm:flex-none bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 shadow-lg hover:shadow-xl transition-all duration-200 text-white font-semibold px-4 sm:px-6 text-sm sm:text-base"
+              >
+                <Share2 className="mr-2 w-4 sm:w-5 h-4 sm:h-5" /> Share
+              </Button>
               {selectedIds.size > 0 && (
                 <Button 
                   onClick={() => setDeleteConfirm({ bulk: true, count: selectedIds.size })}
@@ -297,6 +305,8 @@ const TradingJournal = () => {
           setFilteredEntries(data || []);
         }
       }} />
+
+      <ShareLinkManagementDialog open={openShare} onOpenChange={setOpenShare} />
 
       {/* Search and Filter Bar - Enhanced */}
       <motion.div 
