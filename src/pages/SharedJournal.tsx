@@ -36,12 +36,6 @@ interface ShareLinkData {
   last_accessed_at?: string;
 }
 
-interface UserProfile {
-  id: string;
-  full_name?: string;
-  email?: string;
-}
-
 export default function SharedJournal() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -52,7 +46,6 @@ export default function SharedJournal() {
   const [shareLink, setShareLink] = useState<ShareLinkData | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSharedJournal = async () => {
@@ -84,23 +77,6 @@ export default function SharedJournal() {
         }
 
         setShareLink(link);
-        
-        // Fetch user's name
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', link.user_id)
-          .single();
-
-        if (userData?.full_name) {
-          setUserName(userData.full_name);
-        } else {
-          // Fallback: get from auth.users
-          const { data: authData } = await supabase.auth.admin.getUserById(link.user_id);
-          if (authData?.user?.user_metadata?.full_name) {
-            setUserName(authData.user.user_metadata.full_name);
-          }
-        }
         
         // Fetch trades directly from Supabase
         const { data, error: tradesError } = await supabase
@@ -199,16 +175,9 @@ export default function SharedJournal() {
               <ArrowLeft className="w-4 h-4" />
               Back
             </button>
-            <div className="mb-3">
-              {userName && (
-                <p className="text-xs sm:text-sm text-slate-400 mb-1">
-                  {userName}'s Trading Journal
-                </p>
-              )}
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2 break-words">
-                {shareLink?.title || 'Trading Journal'}
-              </h1>
-            </div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2 break-words">
+              {shareLink?.title || 'Trading Journal'}
+            </h1>
             {shareLink?.description && (
               <p className="text-xs sm:text-sm text-slate-300">{shareLink.description}</p>
             )}
