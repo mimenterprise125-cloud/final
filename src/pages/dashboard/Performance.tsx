@@ -8,7 +8,6 @@ import { motion } from 'framer-motion'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { TrendingUp, TrendingDown, Target, AlertCircle, Zap, Lightbulb, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 import UnderDevelopment from '@/components/UnderDevelopment'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import WeekdayAnalysisSection from '../../components/WeekdayAnalysisSection'
 
 const MetricCard = ({ title, value, hint, icon: Icon, trend }: { title: string; value: string | number; hint?: string; icon?: any; trend?: 'up' | 'down' | 'neutral' }) => {
@@ -101,12 +100,6 @@ const Performance = () => {
   const [entries, setEntries] = useState<any[]>([])
   const [selectedSession, setSelectedSession] = useState<any | null>(null)
   const [sessionModalOpen, setSessionModalOpen] = useState(false)
-  const [accountSize, setAccountSize] = useState<number | string>('')
-  const [dailyLossLimit, setDailyLossLimit] = useState<number | string>('')
-  const [maxDD, setMaxDD] = useState<number | string>('')
-  const [selectedSetup, setSelectedSetup] = useState<string>('')
-  const [availableSetups, setAvailableSetups] = useState<string[]>([])
-  const [targetProfit, setTargetProfit] = useState<number | string>('')
   const [weekOffset, setWeekOffset] = useState(0)
 
   useEffect(() => {
@@ -333,10 +326,6 @@ const Performance = () => {
           bestSession: sessionStats.sort((a,b) => b.pnl - a.pnl)[0] || null
         })
         setEntries(r)
-        
-        // Extract available setups from entries
-        const uniqueSetups = [...new Set(r.map((row:any) => (row.setup || '—').toString()))].filter((s:string) => s !== '—').sort()
-        setAvailableSetups(uniqueSetups as string[])
       } catch (err) {
         console.error('Failed to load performance', err)
       } finally {
@@ -1050,12 +1039,6 @@ const Performance = () => {
       {/* WEEKDAY ANALYSIS SECTION */}
       <WeekdayAnalysisSection 
         trades={entries}
-        accountSize={accountSize}
-        dailyLossLimit={dailyLossLimit}
-        maxDD={maxDD}
-        selectedSetup={selectedSetup}
-        targetProfit={targetProfit}
-        availableSetups={availableSetups}
       />
         </>
       )}
